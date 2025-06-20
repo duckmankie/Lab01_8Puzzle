@@ -3,6 +3,7 @@ import random
 import sys
 import math
 from constants import *
+import threading
 
 def is_solvable(flat_list):
     inv_count = 0
@@ -306,13 +307,13 @@ class EightPuzzle:
     def solve(self):
         if self.in_fade or self.in_reset or self.moving or self.auto_solving:
             return
+        threading.Thread(target=self._thread_solve, daemon=True).start()
 
+    def _thread_solve(self):
         algo = self.selected_algorithm
-
         if algo == "BFS":
-            self.solution_path = bfs(self.board)
-    
-
+            sol = bfs(self.board)
+        self.solution_path = sol
         self.auto_solving = True
         self.auto_solve_index = 0
         self.auto_step_time = pygame.time.get_ticks()
