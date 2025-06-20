@@ -49,7 +49,7 @@ def main():
 
                 
                 if solve_btn.is_clicked(mx, my):
-                    
+                    puzzle.solve()
                     continue
                 if next_btn.is_clicked(mx, my):
                     
@@ -61,8 +61,7 @@ def main():
                 
                 dd_choice = combo.is_clicked(mx, my)
                 if dd_choice is not None:
-                    
-                    
+                    puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                     continue
 
                 

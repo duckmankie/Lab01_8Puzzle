@@ -94,6 +94,15 @@ class EightPuzzle:
         self.dark_overlay = pygame.Surface((PUZZLE_SIZE, PUZZLE_SIZE), flags=pygame.SRCALPHA)
         self.dark_overlay.fill((0, 0, 0, 200))
 
+        self.solution_path = []
+        self.auto_solve_index = 0
+        self.auto_solving = False
+        self.auto_step_time = 0
+        self.auto_step_delay = 300  # milliseconds
+        self.selected_algorithm = "BFS"  # mặc định ban đầu
+
+
+        
     def load_and_slice_image(self, path):
         full_img = pygame.image.load(path).convert_alpha()
         full_img = pygame.transform.smoothscale(full_img, (PUZZLE_SIZE, PUZZLE_SIZE))
@@ -197,6 +206,17 @@ class EightPuzzle:
             self.number_alpha = min(255, self.number_alpha + FADE_SPEED)
         elif not self.show_numbers and self.number_alpha > 0:
             self.number_alpha = max(0, self.number_alpha - FADE_SPEED)
+        if self.auto_solving and not self.moving:
+            now = pygame.time.get_ticks()
+            if now - self.auto_step_time >= self.auto_step_delay:
+                if self.auto_solve_index < len(self.solution_path):
+                    r, c = self.solution_path[self.auto_solve_index]
+                    self.start_move(r, c)
+                    self.auto_solve_index += 1
+                    self.auto_step_time = now
+                else:
+                    self.auto_solving = False
+
 
     def draw_background(self):
         self.screen.fill(COLOR_BG)
@@ -282,6 +302,21 @@ class EightPuzzle:
                 tx = cur_x + TILE_SIZE // 2 - text_surf.get_width() // 2
                 ty = cur_y + TILE_SIZE // 2 - text_surf.get_height() // 2
                 self.screen.blit(text_surf, (tx, ty))
+    
+    def solve(self):
+        if self.in_fade or self.in_reset or self.moving or self.auto_solving:
+            return
+
+        algo = self.selected_algorithm
+
+        if algo == "BFS":
+            self.solution_path = bfs(self.board)
+    
+
+        self.auto_solving = True
+        self.auto_solve_index = 0
+        self.auto_step_time = pygame.time.get_ticks()
+
 
     def shuffle(self):
         self.reset_old_board = [row[:] for row in self.board]
@@ -334,6 +369,8 @@ class EightPuzzle:
         self.next_board = new_board
         self.selected_index = new_index
 
+   
+
     def toggle_numbers(self):
         """
         Bật/tắt show_numbers (sẽ fade qua số hiển thị)
@@ -341,4 +378,38 @@ class EightPuzzle:
         if self.in_fade:
             return
         self.show_numbers = not self.show_numbers
+
+   
+        
+from collections import deque
+import copy
+
+GOAL_STATE = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
+MOVES = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+def serialize(board):
+    return tuple(val for row in board for val in row)
+
+def bfs(start_board):
+    start = copy.deepcopy(start_board)
+    queue = deque([(start, [])])
+    visited = set()
+    visited.add(serialize(start))
+
+    while queue:
+        board, path = queue.popleft()
+        if board == GOAL_STATE:
+            return path
+
+        br, bc = find_blank(board)
+        for dr, dc in MOVES:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < 3 and 0 <= nc < 3:
+                new_board = copy.deepcopy(board)
+                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
+                key = serialize(new_board)
+                if key not in visited:
+                    visited.add(key)
+                    queue.append((new_board, path + [(nr, nc)]))
+    return []
 
