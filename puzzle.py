@@ -313,6 +313,8 @@ class EightPuzzle:
         algo = self.selected_algorithm
         if algo == "BFS":
             sol = bfs(self.board)
+        elif algo == "DFS":
+            sol = dfs(self.board)
         self.solution_path = sol
         self.auto_solving = True
         self.auto_solve_index = 0
@@ -413,4 +415,36 @@ def bfs(start_board):
                     visited.add(key)
                     queue.append((new_board, path + [(nr, nc)]))
     return []
+
+def dfs(start_board, max_depth=30):
+    start = copy.deepcopy(start_board)
+    visited = set()
+    path = []
+
+    def recursive_dfs(board, depth):
+        if board == GOAL_STATE:
+            return True
+        if depth >= max_depth:
+            return False
+
+        key = serialize(board)
+        visited.add(key)
+
+        br, bc = find_blank(board)
+        for dr, dc in MOVES:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < 3 and 0 <= nc < 3:
+                new_board = copy.deepcopy(board)
+                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
+                new_key = serialize(new_board)
+                if new_key not in visited:
+                    path.append((nr, nc))
+                    if recursive_dfs(new_board, depth + 1):
+                        return True
+                    path.pop()
+        return False
+
+    found = recursive_dfs(start, 0)
+    return path if found else []
+
 
