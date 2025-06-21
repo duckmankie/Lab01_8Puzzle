@@ -48,22 +48,18 @@ def ease_out_quint(t):
 class EightPuzzle:
     def __init__(self, screen):
         self.screen = screen
-
         
         self.templates = ALL_TEMPLATE_FILES[:]
         self.selected_index = 0
-
         self.thumb_surfaces = []
         for path in self.templates:
             img = pygame.image.load(path).convert_alpha()
             img = pygame.transform.smoothscale(img, (IMAGE_THUMB_SIZE, IMAGE_THUMB_SIZE))
             self.thumb_surfaces.append(img)
 
-        
         self.pieces, self.full_image = self.load_and_slice_image(self.templates[self.selected_index])
         self.board = generate_solvable_board()
 
-        
         self.moving = False
         self.start_time = 0
         self.duration = ANIM_DURATION_MS
@@ -71,14 +67,12 @@ class EightPuzzle:
         self.dst_pos = None
         self.moving_tile = None
 
-        
         self.in_reset = False
         self.reset_start_time = 0
         self.reset_old_board = None
         self.reset_new_board = None
         self.reset_animations = []
 
-        
         self.in_fade = False
         self.fade_alpha = 255
         self.fade_old_surface = None
@@ -87,11 +81,9 @@ class EightPuzzle:
         self.next_full = None
         self.next_board = None
 
-        
         self.show_numbers = False
         self.number_alpha = 0  
 
-        
         self.dark_overlay = pygame.Surface((PUZZLE_SIZE, PUZZLE_SIZE), flags=pygame.SRCALPHA)
         self.dark_overlay.fill((0, 0, 0, 200))
 
@@ -101,6 +93,9 @@ class EightPuzzle:
         self.auto_step_time = 0
         self.auto_step_delay = 300  # milliseconds
         self.selected_algorithm = "BFS"  # mặc định ban đầu
+
+    def stop_solve(self):
+        self.auto_solving = False
 
 
         

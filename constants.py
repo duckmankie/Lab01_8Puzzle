@@ -1,5 +1,17 @@
 import os
 
+def lighten_color(color, amount=40):
+    r = min(color[0] + amount, 255)
+    g = min(color[1] + amount, 255)
+    b = min(color[2] + amount, 255)
+    return (r, g, b)
+
+def darken_color(color, amount=40):
+    r = max(color[0] - amount, 0)
+    g = max(color[1] - amount, 0)
+    b = max(color[2] - amount, 0)
+    return (r, g, b)
+
 WINDOW_WIDTH, WINDOW_HEIGHT = 1280, 720
 
 BOARD_REGION_WIDTH = 720
@@ -26,6 +38,10 @@ COLOR_TEXT = (220, 220, 220)
 COLOR_BUTTON = (60, 60, 60)
 COLOR_BUTTON_HOVER = (100, 100, 100)
 
+# Dropdown specific colors
+COLOR_DROPDOWN = (66,69,73)
+COLOR_DROPDOWN_HOVER = (126, 152, 241)
+
 TEMPLATE_DIR = "assets/templates"
 
 ALL_TEMPLATE_FILES = [
@@ -44,4 +60,4 @@ CHECKBOX_Y = WINDOW_HEIGHT - 60
 LABEL_X = CHECKBOX_X + CHECKBOX_SIZE + 10
 LABEL_Y = CHECKBOX_Y - 2
 
-ALGORITHMS = ["BFS", "DFS", "A*", "Dijkstra"]
+ALGORITHMS = ["BFS", "DFS", "A*", "Dijkstra", "UCS", "IDDFS", "IDA*", "Bi-dir Search"]
