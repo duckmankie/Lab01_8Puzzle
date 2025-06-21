@@ -2,6 +2,230 @@
 
 import pygame
 from constants import *
+from puzzle import pixel_to_grid
+
+def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
+    # Draw border around button group
+    BUTTON_GROUP_PADDING = 10
+    group_left = solve_btn.rect.x - BUTTON_GROUP_PADDING
+    group_top = solve_btn.rect.y - BUTTON_GROUP_PADDING
+    group_width = solve_btn.rect.width + 2 * BUTTON_GROUP_PADDING
+    group_height = (reset_btn.rect.bottom - solve_btn.rect.y) + 2 * BUTTON_GROUP_PADDING
+    pygame.draw.rect(screen, (120, 120, 120), (group_left, group_top, group_width, group_height), 2)
+    # Draw solve_btn with tween color
+    solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=tween_color)
+    if solve_btn_disabled:
+        s = pygame.Surface((solve_btn.rect.width, solve_btn.rect.height), pygame.SRCALPHA)
+        s.fill((0,0,0,80))
+        screen.blit(s, solve_btn.rect.topleft)
+    # Next/Reset buttons
+    next_btn.draw(screen, disabled_hover=False)
+    reset_btn.draw(screen, disabled_hover=False)
+    combo.draw(screen)
+    checkbox.draw(screen)
+    # Draw thumbnails
+    thumb_y = 20
+    thumb_x = RIGHT_PANEL_X + 20
+    for i in range(THUMBS_PER_ROW):
+        idx = i
+        if idx >= len(puzzle.templates):
+            break
+        rect = pygame.Rect(
+            thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
+            thumb_y,
+            IMAGE_THUMB_SIZE,
+            IMAGE_THUMB_SIZE
+        )
+        screen.blit(puzzle.thumb_surfaces[idx], rect.topleft)
+        if idx == puzzle.selected_index:
+            pygame.draw.rect(screen, COLOR_HIGHLIGHT, rect, 3)
+
+
+def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, combo, checkbox, is_solving):
+    action = None
+    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        mx, my = pygame.mouse.get_pos()
+        # Dropdown click handling
+        if not is_solving:
+            dd_choice = combo.is_clicked(mx, my)
+            if dd_choice is not None:
+                puzzle.selected_algorithm = ALGORITHMS[dd_choice]
+                action = 'algorithm_changed'
+                return is_solving, action
+        # Dropdown close if click outside
+        if combo.is_open and not is_solving:
+            dropdown_rect = combo.header_rect.copy()
+            dropdown_rect.height += combo.header_rect.height * (len(combo.options))
+            if not dropdown_rect.collidepoint(mx, my):
+                combo.is_open = False
+            else:
+                return is_solving, action
+        # Puzzle grid click
+        if (not is_solving and PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
+            PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE and
+            not puzzle.in_reset and not puzzle.in_fade):
+            gr, gc = pixel_to_grid(mx, my)
+            if gr is not None:
+                puzzle.start_move(gr, gc)
+                action = 'board_changed'
+                return is_solving, action
+        # Checkbox click
+        if checkbox.is_clicked(mx, my):
+            puzzle.toggle_numbers()
+            return is_solving, action
+        # Buttons click
+        if solve_btn.is_clicked(mx, my):
+            if not is_solving:
+                is_solving = True
+                solve_btn.label = "Stop"
+                solve_btn.color_override = (237,85,85)
+                action = 'solve'
+            else:
+                is_solving = False
+                solve_btn.label = "Solve"
+                solve_btn.color_override = None
+                action = 'stop_solve'
+            return is_solving, action
+        if next_btn.is_clicked(mx, my) and not is_solving:
+            action = 'next_step'
+            return is_solving, action
+        if reset_btn.is_clicked(mx, my) and not is_solving:
+            puzzle.shuffle()
+            action = 'reset'
+            return is_solving, action
+        # Thumbnail click
+        if not is_solving:
+            thumb_y = 20
+            thumb_x = RIGHT_PANEL_X + 20
+            for i in range(THUMBS_PER_ROW):
+                idx = i
+                if idx >= len(puzzle.templates):
+                    break
+                rect = pygame.Rect(
+                    thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
+                    thumb_y,
+                    IMAGE_THUMB_SIZE,
+                    IMAGE_THUMB_SIZE
+                )
+                if rect.collidepoint(mx, my):
+                    puzzle.prepare_fade(idx)
+                    action = 'board_changed'
+                    return is_solving, action
+    return is_solving, action
+
+class GameUI:
+    def __init__(self, screen, puzzle):
+        self.screen = screen
+        self.puzzle = puzzle
+        self.solve_btn = Button(RIGHT_PANEL_X + 30, 215, RIGHT_PANEL_WIDTH - 60, 50, "Solve")
+        self.next_btn = Button(RIGHT_PANEL_X + 30, 275, RIGHT_PANEL_WIDTH - 60, 50, "Next Step")
+        self.reset_btn = Button(RIGHT_PANEL_X + 30, 335, RIGHT_PANEL_WIDTH - 60, 50, "Reset")
+        self.combo = Dropdown(RIGHT_PANEL_X + 20, 140, RIGHT_PANEL_WIDTH - 40, 50, ALGORITHMS)
+        self.checkbox = Checkbox(CHECKBOX_X, CHECKBOX_Y, CHECKBOX_SIZE, "Show Numbers")
+        self.is_solving = False
+        self.solve_btn_color_progress = 0.0
+        self.SOLVE_BTN_TWEEN_SPEED = 0.08
+
+    def draw(self):
+        # Xử lý trạng thái nút Solve khi completed
+        if self.puzzle.completed:
+            self.solve_btn.label = "Solved"
+            self.solve_btn.color_override = (60, 180, 60)
+            solve_disabled = True
+            self.is_solving = False
+        else:
+            if not self.is_solving:
+                self.solve_btn.label = "Solve"
+                self.solve_btn.color_override = None
+            solve_disabled = False
+        # Tween màu solve_btn
+        solve_btn_base = (60, 60, 60)
+        solve_btn_red = (234, 69, 69)
+        if self.is_solving:
+            self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
+        else:
+            self.solve_btn_color_progress = max(0.0, self.solve_btn_color_progress - self.SOLVE_BTN_TWEEN_SPEED)
+        tween_color = tuple(
+            int(solve_btn_base[i] + (solve_btn_red[i] - solve_btn_base[i]) * self.solve_btn_color_progress)
+            for i in range(3)
+        )
+        # Vẽ UI, truyền trạng thái disable cho solve_btn
+        draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.combo, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, tween_color, solve_btn_disabled=solve_disabled)
+
+    def handle_click(self, mx, my):
+        # Dropdown click
+        if not self.is_solving:
+            dd_choice = self.combo.is_clicked(mx, my)
+            if dd_choice is not None:
+                self.puzzle.selected_algorithm = ALGORITHMS[dd_choice]
+                return
+        # Dropdown close if click outside
+        if self.combo.is_open and not self.is_solving:
+            dropdown_rect = self.combo.header_rect.copy()
+            dropdown_rect.height += self.combo.header_rect.height * (len(self.combo.options))
+            if not dropdown_rect.collidepoint(mx, my):
+                self.combo.is_open = False
+            else:
+                return
+        # Puzzle grid click
+        if (not self.is_solving and PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
+            PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE and
+            not self.puzzle.in_reset and not self.puzzle.in_fade):
+            gr, gc = pixel_to_grid(mx, my)
+            if gr is not None:
+                self.puzzle.start_move(gr, gc)
+                return
+        # Checkbox click
+        if self.checkbox.is_clicked(mx, my):
+            self.puzzle.toggle_numbers()
+            return
+        # Buttons click
+        if self.solve_btn.is_clicked(mx, my):
+            if self.puzzle.completed:
+                return  # Đã solved thì không cho bấm nữa
+            if not self.is_solving:
+                self.is_solving = True
+                self.solve_btn.label = "Stop"
+                self.solve_btn.color_override = (237,85,85)
+                self.puzzle.solve()
+            else:
+                self.is_solving = False
+                self.solve_btn.label = "Solve"
+                self.solve_btn.color_override = None
+                if hasattr(self.puzzle, 'stop_solve'):
+                    self.puzzle.stop_solve()
+            return
+        if self.next_btn.is_clicked(mx, my):
+            self.puzzle.next_step()
+            return
+        if self.reset_btn.is_clicked(mx, my) and not self.is_solving:
+            self.puzzle.shuffle()
+            # Enable lại solve_btn
+            self.solve_btn.label = "Solve"
+            self.solve_btn.color_override = None
+            self.is_solving = False
+            return
+        # Thumbnail click
+        if not self.is_solving:
+            thumb_y = 20
+            thumb_x = RIGHT_PANEL_X + 20
+            for i in range(THUMBS_PER_ROW):
+                idx = i
+                if idx >= len(self.puzzle.templates):
+                    break
+                rect = pygame.Rect(
+                    thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
+                    thumb_y,
+                    IMAGE_THUMB_SIZE,
+                    IMAGE_THUMB_SIZE
+                )
+                if rect.collidepoint(mx, my):
+                    self.puzzle.prepare_fade(idx)
+                    # Enable lại solve_btn khi đổi puzzle
+                    self.solve_btn.label = "Solve"
+                    self.solve_btn.color_override = None
+                    self.is_solving = False
+                    return
 
 class Button:
     def __init__(self, x, y, w, h, label, color_override=None):

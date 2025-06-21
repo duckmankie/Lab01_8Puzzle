@@ -4,6 +4,7 @@ import sys
 import math
 from constants import *
 import threading
+from solver import bfs, dfs, find_blank
 
 def is_solvable(flat_list):
     inv_count = 0
@@ -93,6 +94,7 @@ class EightPuzzle:
         self.auto_step_time = 0
         self.auto_step_delay = 300  # milliseconds
         self.selected_algorithm = "BFS"  # mặc định ban đầu
+        self.completed = False
 
     def stop_solve(self):
         self.auto_solving = False
@@ -197,7 +199,12 @@ class EightPuzzle:
                 self.dst_pos = None
                 self.moving_tile = None
 
-        
+        # Đánh dấu completed nếu board đã về đích
+        if self.board == [[0,1,2],[3,4,5],[6,7,8]]:
+            self.completed = True
+        else:
+            self.completed = False
+
         if self.show_numbers and self.number_alpha < 255:
             self.number_alpha = min(255, self.number_alpha + FADE_SPEED)
         elif not self.show_numbers and self.number_alpha > 0:
@@ -310,16 +317,29 @@ class EightPuzzle:
             sol = bfs(self.board)
         elif algo == "DFS":
             sol = dfs(self.board)
+        else:
+            sol = []
         self.solution_path = sol
         self.auto_solving = True
         self.auto_solve_index = 0
         self.auto_step_time = pygame.time.get_ticks()
 
+    def next_step(self):
+        # Thực hiện 1 bước tiếp theo trong solution_path nếu có
+        if self.auto_solve_index < len(self.solution_path) and not self.moving:
+            r, c = self.solution_path[self.auto_solve_index]
+            self.start_move(r, c)
+            self.auto_solve_index += 1
 
     def shuffle(self):
         self.reset_old_board = [row[:] for row in self.board]
         self.reset_new_board = generate_solvable_board()
         self.reset_animations = []
+        # Reset trạng thái giải
+        self.solution_path = []
+        self.auto_solve_index = 0
+        self.auto_solving = False
+        self.completed = False
         for r in range(3):
             for c in range(3):
                 val = self.reset_old_board[r][c]
@@ -345,7 +365,11 @@ class EightPuzzle:
             return
         if self.moving or self.in_reset or self.in_fade:
             return
-        
+        # Reset trạng thái giải khi đổi template
+        self.solution_path = []
+        self.auto_solve_index = 0
+        self.auto_solving = False
+        self.completed = False
         self.fade_old_surface = self.capture_puzzle_surface(
             self.pieces, self.board, self.full_image, self.show_numbers
         )
@@ -379,67 +403,5 @@ class EightPuzzle:
 
    
         
-from collections import deque
-import copy
-
-GOAL_STATE = [[0, 1, 2], [3, 4, 5], [6, 7, 8]]
-MOVES = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-
-def serialize(board):
-    return tuple(val for row in board for val in row)
-
-def bfs(start_board):
-    start = copy.deepcopy(start_board)
-    queue = deque([(start, [])])
-    visited = set()
-    visited.add(serialize(start))
-
-    while queue:
-        board, path = queue.popleft()
-        if board == GOAL_STATE:
-            return path
-
-        br, bc = find_blank(board)
-        for dr, dc in MOVES:
-            nr, nc = br + dr, bc + dc
-            if 0 <= nr < 3 and 0 <= nc < 3:
-                new_board = copy.deepcopy(board)
-                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
-                key = serialize(new_board)
-                if key not in visited:
-                    visited.add(key)
-                    queue.append((new_board, path + [(nr, nc)]))
-    return []
-
-def dfs(start_board, max_depth=30):
-    start = copy.deepcopy(start_board)
-    visited = set()
-    path = []
-
-    def recursive_dfs(board, depth):
-        if board == GOAL_STATE:
-            return True
-        if depth >= max_depth:
-            return False
-
-        key = serialize(board)
-        visited.add(key)
-
-        br, bc = find_blank(board)
-        for dr, dc in MOVES:
-            nr, nc = br + dr, bc + dc
-            if 0 <= nr < 3 and 0 <= nc < 3:
-                new_board = copy.deepcopy(board)
-                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
-                new_key = serialize(new_board)
-                if new_key not in visited:
-                    path.append((nr, nc))
-                    if recursive_dfs(new_board, depth + 1):
-                        return True
-                    path.pop()
-        return False
-
-    found = recursive_dfs(start, 0)
-    return path if found else []
 
 
