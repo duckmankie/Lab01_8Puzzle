@@ -30,7 +30,7 @@ def bfs(start_board):
                     queue.append((new_board, path + [(nr, nc)]))
     return []
 
-def dfs(start_board, max_depth=30):
+def dfs(start_board, max_depth=500):
     start = copy.deepcopy(start_board)
     visited = set()
     path = []
@@ -60,6 +60,44 @@ def dfs(start_board, max_depth=30):
 
     found = recursive_dfs(start, 0)
     return path if found else []
+
+def iddfs(start_board, max_depth=500):
+    start = copy.deepcopy(start_board)
+
+    def dls(board, depth_limit, path, visited):
+        if board == GOAL_STATE:
+            return path
+
+        if len(path) >= depth_limit:
+            return None
+
+        key = serialize(board)
+        visited.add(key)
+
+        br, bc = find_blank(board)
+        for dr, dc in MOVES:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < 3 and 0 <= nc < 3:
+                new_board = copy.deepcopy(board)
+                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
+                new_key = serialize(new_board)
+                if new_key not in visited:
+                    path.append((nr, nc))
+                    result = dls(new_board, depth_limit, path, visited)
+                    if result is not None:
+                        return result
+                    path.pop()
+        return None
+
+    for depth in range(1, max_depth + 1):
+        visited = set()
+        path = []
+        result = dls(start, depth, path, visited)
+        if result is not None:
+            return result
+
+    return []  # Không tìm thấy lời giải trong max_depth bước
+
 
 def find_blank(board):
     for r in range(3):

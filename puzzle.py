@@ -4,7 +4,7 @@ import sys
 import math
 from constants import *
 import threading
-from solver import bfs, dfs, find_blank
+from solver import bfs, dfs, iddfs, find_blank
 
 def is_solvable(flat_list):
     inv_count = 0
@@ -317,6 +317,8 @@ class EightPuzzle:
             sol = bfs(self.board)
         elif algo == "DFS":
             sol = dfs(self.board)
+        elif algo == "IDDFS":
+            sol = iddfs(self.board)
         else:
             sol = []
         self.solution_path = sol
