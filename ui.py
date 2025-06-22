@@ -5,7 +5,7 @@ from constants import *
 
 from puzzle import pixel_to_grid
 
-def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
+def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
     # Draw solve_btn với tween color chỉ khi đang solve, còn lại để None để dùng COLOR_BUTTON mặc định
     solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=(tween_color if solve_btn.color_override is not None else None))
     if solve_btn_disabled:
@@ -18,10 +18,10 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_
     # Vẽ chữ nhỏ "choose algorithm" phía trên, bên trái dropdown
     font_label = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 18)
     label_surface = font_label.render("Choose Algorithm", True, COLOR_TEXT)
-    label_x = combo.header_rect.x
-    label_y = combo.header_rect.y - label_surface.get_height() - 4
+    label_x = dropdown.header_rect.x
+    label_y = dropdown.header_rect.y - label_surface.get_height() - 8
     screen.blit(label_surface, (label_x, label_y))
-    combo.draw(screen)
+    dropdown.draw(screen)
     checkbox.draw(screen)
     # Draw thumbnails
     thumb_y = 20
@@ -41,23 +41,23 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_
             pygame.draw.rect(screen, COLOR_HIGHLIGHT, rect, 3)
 
 
-def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, combo, checkbox, is_solving):
+def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, checkbox, is_solving):
     action = None
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
         mx, my = pygame.mouse.get_pos()
         # Dropdown click handling
         if not is_solving:
-            dd_choice = combo.is_clicked(mx, my)
+            dd_choice = dropdown.is_clicked(mx, my)
             if dd_choice is not None:
                 puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                 action = 'algorithm_changed'
                 return is_solving, action
         # Dropdown close if click outside
-        if combo.is_open and not is_solving:
-            dropdown_rect = combo.header_rect.copy()
-            dropdown_rect.height += combo.header_rect.height * (len(combo.options))
+        if dropdown.is_open and not is_solving:
+            dropdown_rect = dropdown.header_rect.copy()
+            dropdown_rect.height += dropdown.header_rect.height * (len(dropdown.options))
             if not dropdown_rect.collidepoint(mx, my):
-                combo.is_open = False
+                dropdown.is_open = False
             else:
                 return is_solving, action
         # Puzzle grid click
@@ -117,10 +117,10 @@ class GameUI:
     def __init__(self, screen, puzzle):
         self.screen = screen
         self.puzzle = puzzle
-        self.solve_btn = Button(RIGHT_PANEL_X + 30, 215, RIGHT_PANEL_WIDTH - 60, 50, "Solve")
-        self.next_btn = Button(RIGHT_PANEL_X + 30, 275, RIGHT_PANEL_WIDTH - 60, 50, "Next Step")
-        self.reset_btn = Button(RIGHT_PANEL_X + 30, 335, RIGHT_PANEL_WIDTH - 60, 50, "Reset")
-        self.combo = Dropdown(RIGHT_PANEL_X + 20, 140, RIGHT_PANEL_WIDTH - 40, 50, ALGORITHMS)
+        self.solve_btn = Button(RIGHT_PANEL_X + 20, 210, RIGHT_PANEL_WIDTH - 310, 50, "Solve")
+        self.next_btn = Button(RIGHT_PANEL_X + 280, 210, RIGHT_PANEL_WIDTH - 310, 50, "Next Step")
+        self.reset_btn = Button(RIGHT_PANEL_X + 20, 270, RIGHT_PANEL_WIDTH - 50, 50, "Reset")
+        self.dropdown = Dropdown(RIGHT_PANEL_X + 20, 150, RIGHT_PANEL_WIDTH - 50, 50, ALGORITHMS)
         self.checkbox = Checkbox(CHECKBOX_X, CHECKBOX_Y, CHECKBOX_SIZE, "Show Numbers")
         self.is_solving = False
         self.solve_btn_color_progress = 0.0
@@ -130,7 +130,7 @@ class GameUI:
         # Xử lý trạng thái nút Solve khi completed
         if self.puzzle.completed:
             self.solve_btn.label = "Solved"
-            self.solve_btn.color_override = (60, 180, 60)
+            self.solve_btn.color_override = COLOR_BG
             solve_disabled = True
             self.is_solving = False
         else:
@@ -139,7 +139,7 @@ class GameUI:
                 self.solve_btn.color_override = None
             solve_disabled = False
         # Tween màu solve_btn
-        solve_btn_base = (60, 60, 60)
+        solve_btn_base = COLOR_BG
         solve_btn_red = (234, 69, 69)
         if self.is_solving:
             self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
@@ -150,21 +150,21 @@ class GameUI:
             for i in range(3)
         )
         # Vẽ UI, truyền trạng thái disable cho solve_btn
-        draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.combo, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, tween_color, solve_btn_disabled=solve_disabled)
+        draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, tween_color, solve_btn_disabled=solve_disabled)
 
     def handle_click(self, mx, my):
         # Dropdown click
         if not self.is_solving:
-            dd_choice = self.combo.is_clicked(mx, my)
+            dd_choice = self.dropdown.is_clicked(mx, my)
             if dd_choice is not None:
                 self.puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                 return
         # Dropdown close if click outside
-        if self.combo.is_open and not self.is_solving:
-            dropdown_rect = self.combo.header_rect.copy()
-            dropdown_rect.height += self.combo.header_rect.height * (len(self.combo.options))
+        if self.dropdown.is_open and not self.is_solving:
+            dropdown_rect = self.dropdown.header_rect.copy()
+            dropdown_rect.height += self.dropdown.header_rect.height * (len(self.dropdown.options))
             if not dropdown_rect.collidepoint(mx, my):
-                self.combo.is_open = False
+                self.dropdown.is_open = False
             else:
                 return
         # Puzzle grid click
@@ -354,7 +354,7 @@ class Dropdown:
         ], 3)
 
         # Draw outline for header
-        pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.header_rect, BUTTON_OUTLINE_THICKNESS, border_radius=DROPDOWN_RADIUS)
+        #pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.header_rect, BUTTON_OUTLINE_THICKNESS, border_radius=DROPDOWN_RADIUS)
 
         # --- Draw dropdown menu if open ---
         if self.is_open:
