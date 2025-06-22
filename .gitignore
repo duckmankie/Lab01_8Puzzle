@@ -52,3 +52,6 @@ Thumbs.db
 instance/
 celerybeat.pid
 /__pycache__
+__pycache__/constants.cpython-313.pyc
+__pycache__/puzzle.cpython-313.pyc
+__pycache__/ui.cpython-313.pyc
