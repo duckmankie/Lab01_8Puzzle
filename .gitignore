@@ -51,3 +51,4 @@ Thumbs.db
 .flaskenv
 instance/
 celerybeat.pid
+/__pycache__
