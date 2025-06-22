@@ -89,12 +89,16 @@ class EightPuzzle:
         self.dark_overlay.fill((0, 0, 0, 200))
 
         self.solution_path = []
+        self.nodes_expanded = 0
+        self.total_cost = 0
+        self.solve_time = 0.0
         self.auto_solve_index = 0
         self.auto_solving = False
         self.auto_step_time = 0
         self.auto_step_delay = 300  # milliseconds
         self.selected_algorithm = "BFS"  # mặc định ban đầu
         self.completed = False
+        self.frontier_nodes = 0
 
     def stop_solve(self):
         self.auto_solving = False
@@ -314,16 +318,20 @@ class EightPuzzle:
     def _thread_solve(self):
         algo = self.selected_algorithm
         if algo == "BFS":
-            sol = bfs(self.board)
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = bfs(self.board)
         elif algo == "DFS":
-            sol = dfs(self.board)
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = dfs(self.board)
         elif algo == "IDDFS":
-            sol = iddfs(self.board)
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = iddfs(self.board)
         elif algo == "UCS":
-            sol = ucs(self.board)
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = ucs(self.board)
         else:
-            sol = []
-        self.solution_path = sol
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = [], 0, 0, 0.0, 0
+        self.solution_path = path
+        self.nodes_expanded = nodes_expanded
+        self.total_cost = total_cost
+        self.solve_time = solve_time
+        self.frontier_nodes = frontier_nodes
         self.auto_solving = True
         self.auto_solve_index = 0
         self.auto_step_time = pygame.time.get_ticks()
@@ -341,6 +349,10 @@ class EightPuzzle:
         self.reset_animations = []
         # Reset trạng thái giải
         self.solution_path = []
+        self.nodes_expanded = 0
+        self.total_cost = 0
+        self.solve_time = 0.0
+        self.frontier_nodes = 0
         self.auto_solve_index = 0
         self.auto_solving = False
         self.completed = False
@@ -371,6 +383,10 @@ class EightPuzzle:
             return
         # Reset trạng thái giải khi đổi template
         self.solution_path = []
+        self.nodes_expanded = 0
+        self.total_cost = 0
+        self.solve_time = 0.0
+        self.frontier_nodes = 0
         self.auto_solve_index = 0
         self.auto_solving = False
         self.completed = False

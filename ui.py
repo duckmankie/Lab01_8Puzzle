@@ -133,11 +133,13 @@ class GameUI:
             self.solve_btn.color_override = COLOR_BG
             solve_disabled = True
             self.is_solving = False
+            self.solve_btn.disabled = True  # Custom attribute to mark as truly disabled
         else:
             if not self.is_solving:
                 self.solve_btn.label = "Solve"
                 self.solve_btn.color_override = None
             solve_disabled = False
+            self.solve_btn.disabled = False
         # Tween màu solve_btn
         solve_btn_base = COLOR_BG
         solve_btn_red = (234, 69, 69)
@@ -151,6 +153,41 @@ class GameUI:
         )
         # Vẽ UI, truyền trạng thái disable cho solve_btn
         draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, tween_color, solve_btn_disabled=solve_disabled)
+        # Ensure the button is truly not clickable when disabled
+        self.solve_btn.disabled = solve_disabled
+
+        # --- Result display ---
+        font_result = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
+        x = RIGHT_PANEL_X + 20
+        y = 390  # Move further down
+        color = COLOR_TEXT
+        line_spacing = 14  # Extra space between lines
+        if self.is_solving:
+            steps_str = ""
+            expanded_str = ""
+            frontier_str = ""
+            cost_str = ""
+            time_str = ""
+        else:
+            steps_str = str(len(self.puzzle.solution_path)) if self.puzzle.solution_path else "0"
+            expanded_str = str(self.puzzle.nodes_expanded) if self.puzzle.solution_path else "0"
+            frontier_str = str(self.puzzle.frontier_nodes) if self.puzzle.solution_path else "0"
+            cost_str = str(self.puzzle.total_cost) if self.puzzle.solution_path else "0"
+            time_str = f"{self.puzzle.solve_time:.3f} s" if self.puzzle.solution_path else "0.000 s"
+        lines = [
+            f"Steps: {steps_str}",
+            f"Expanded nodes: {expanded_str}",
+            f"Frontier nodes: {frontier_str}",
+            f"Total cost: {cost_str}",
+            f"Processing time: {time_str}",
+        ]
+        for line in lines:
+            surf = font_result.render(line, True, color)
+            self.screen.blit(surf, (x, y))
+            y += surf.get_height() + line_spacing
+
+        # Draw dropdown last so it overlays everything
+        self.dropdown.draw(self.screen)
 
     def handle_click(self, mx, my):
         # Dropdown click
@@ -237,7 +274,9 @@ class Button:
 
     def draw(self, screen, disabled_hover=False, disabled=False, color_override=None):
         mx, my = pygame.mouse.get_pos()
-        hovered = self.rect.collidepoint(mx, my) and not disabled_hover and not disabled
+        # Use self.disabled if set, or fallback to argument
+        is_disabled = getattr(self, 'disabled', False) or disabled
+        hovered = self.rect.collidepoint(mx, my) and not disabled_hover and not is_disabled
         from constants import lighten_color
         # Chọn màu nền
         base_color = self.color_override if self.color_override is not None else COLOR_BUTTON
@@ -245,14 +284,14 @@ class Button:
             base_color = color_override
         from constants import darken_color
         # Nếu disabled thì làm tối màu (dùng darken_color)
-        if disabled:
+        if is_disabled:
             base_color = darken_color(base_color, 40)
         # Tween hover effect
         if hovered:
             self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
         else:
             self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
-        color = lighten_color(base_color, int(self.hover_amount) if not disabled else 0)
+        color = lighten_color(base_color, int(self.hover_amount) if not is_disabled else 0)
         pygame.draw.rect(screen, color, self.rect, border_radius=BUTTON_RADIUS)
         pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.rect, BUTTON_OUTLINE_THICKNESS, border_radius=BUTTON_RADIUS)
         txt = self.font.render(self.label, True, COLOR_TEXT)
@@ -270,6 +309,9 @@ class Button:
         screen.blit(txt, txt_rect)
 
     def is_clicked(self, mx, my):
+        # If truly disabled, never clickable
+        if getattr(self, 'disabled', False):
+            return False
         return self.rect.collidepoint(mx, my)
 
 
@@ -277,14 +319,14 @@ class Checkbox:
     def __init__(self, x, y, size, label):
         self.rect = pygame.Rect(x, y, size, size)
         self.label = label
-        self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 24)
+        self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 18)
         self.is_checked = False
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mx, my)
         from constants import lighten_color
-        color = lighten_color(COLOR_BUTTON, 40) if hovered else COLOR_BUTTON
+        color = lighten_color(CHECKBOX_BUTTON, 40) if hovered else CHECKBOX_BUTTON
         pygame.draw.rect(screen, color, self.rect)  # Không bo góc
         if self.is_checked:
             
