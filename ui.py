@@ -2,18 +2,12 @@
 
 import pygame
 from constants import *
+
 from puzzle import pixel_to_grid
 
 def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
-    # Draw border around button group
-    BUTTON_GROUP_PADDING = 10
-    group_left = solve_btn.rect.x - BUTTON_GROUP_PADDING
-    group_top = solve_btn.rect.y - BUTTON_GROUP_PADDING
-    group_width = solve_btn.rect.width + 2 * BUTTON_GROUP_PADDING
-    group_height = (reset_btn.rect.bottom - solve_btn.rect.y) + 2 * BUTTON_GROUP_PADDING
-    pygame.draw.rect(screen, (120, 120, 120), (group_left, group_top, group_width, group_height), 2)
-    # Draw solve_btn with tween color
-    solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=tween_color)
+    # Draw solve_btn với tween color chỉ khi đang solve, còn lại để None để dùng COLOR_BUTTON mặc định
+    solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=(tween_color if solve_btn.color_override is not None else None))
     if solve_btn_disabled:
         s = pygame.Surface((solve_btn.rect.width, solve_btn.rect.height), pygame.SRCALPHA)
         s.fill((0,0,0,80))
@@ -21,6 +15,12 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, combo, checkbox, puzzle, is_
     # Next/Reset buttons
     next_btn.draw(screen, disabled_hover=False)
     reset_btn.draw(screen, disabled_hover=False)
+    # Vẽ chữ nhỏ "choose algorithm" phía trên, bên trái dropdown
+    font_label = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 18)
+    label_surface = font_label.render("Choose Algorithm", True, COLOR_TEXT)
+    label_x = combo.header_rect.x
+    label_y = combo.header_rect.y - label_surface.get_height() - 4
+    screen.blit(label_surface, (label_x, label_y))
     combo.draw(screen)
     checkbox.draw(screen)
     # Draw thumbnails
@@ -231,7 +231,7 @@ class Button:
     def __init__(self, x, y, w, h, label, color_override=None):
         self.rect = pygame.Rect(x, y, w, h)
         self.label = label
-        self.font = pygame.font.SysFont(None, 30)
+        self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 22)
         self.hover_amount = 0  # For tween effect
         self.color_override = color_override
 
@@ -249,13 +249,24 @@ class Button:
             base_color = darken_color(base_color, 40)
         # Tween hover effect
         if hovered:
-            self.hover_amount = min(self.hover_amount + 8, 40)
+            self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
         else:
-            self.hover_amount = max(self.hover_amount - 8, 0)
+            self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
         color = lighten_color(base_color, int(self.hover_amount) if not disabled else 0)
-        pygame.draw.rect(screen, color, self.rect)
+        pygame.draw.rect(screen, color, self.rect, border_radius=BUTTON_RADIUS)
+        pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.rect, BUTTON_OUTLINE_THICKNESS, border_radius=BUTTON_RADIUS)
         txt = self.font.render(self.label, True, COLOR_TEXT)
-        txt_rect = txt.get_rect(center=self.rect.center)
+        # Padding cho text
+        PADDING_X = 12
+        PADDING_Y = 6
+        txt_rect = txt.get_rect()
+        txt_rect.centerx = self.rect.centerx
+        txt_rect.centery = self.rect.centery
+        # Đảm bảo text không sát viền button
+        if txt_rect.width > self.rect.width - 2 * PADDING_X:
+            txt_rect.width = self.rect.width - 2 * PADDING_X
+        if txt_rect.height > self.rect.height - 2 * PADDING_Y:
+            txt_rect.height = self.rect.height - 2 * PADDING_Y
         screen.blit(txt, txt_rect)
 
     def is_clicked(self, mx, my):
@@ -266,14 +277,15 @@ class Checkbox:
     def __init__(self, x, y, size, label):
         self.rect = pygame.Rect(x, y, size, size)
         self.label = label
-        self.font = pygame.font.SysFont(None, 24)
+        self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 24)
         self.is_checked = False
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mx, my)
-        color = COLOR_BUTTON_HOVER if hovered else COLOR_BUTTON
-        pygame.draw.rect(screen, color, self.rect, border_radius=6)
+        from constants import lighten_color
+        color = lighten_color(COLOR_BUTTON, 40) if hovered else COLOR_BUTTON
+        pygame.draw.rect(screen, color, self.rect)  # Không bo góc
         if self.is_checked:
             
             pygame.draw.line(screen, COLOR_TEXT,
@@ -300,73 +312,111 @@ class Dropdown:
         self.options = options
         self.current = 0
         self.is_open = False
-        self.font = pygame.font.SysFont(None, 30)
+        self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
         self.hover_amount = 0  # For tween effect
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
+        from constants import lighten_color
+
+        # --- Draw dropdown header (button) ---
         hovered = self.header_rect.collidepoint(mx, my)
-        from constants import COLOR_DROPDOWN, lighten_color
-        # Tween hover effect for dropdown
         if hovered:
-            self.hover_amount = min(self.hover_amount + 8, 40)
+            self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
         else:
-            self.hover_amount = max(self.hover_amount - 8, 0)
-        color = lighten_color(COLOR_DROPDOWN, int(self.hover_amount))
-        pygame.draw.rect(screen, color, self.header_rect)
-        # Padding for arrow
+            self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
+        color = lighten_color(COLOR_DROPDOWN_BUTTON, int(self.hover_amount))
+        pygame.draw.rect(screen, color, self.header_rect, border_radius=DROPDOWN_RADIUS)
+
+        # Draw text in header
+        PADDING_X = 12
+        PADDING_Y = 6
         ARROW_PADDING = 35
-        ARROW_WIDTH = 10
-        ARROW_HEIGHT = 8
-        # Adjust text rect to not overlap arrow
-        text_area = pygame.Rect(
-            self.header_rect.x + 8,
-            self.header_rect.y,
-            self.header_rect.width - ARROW_PADDING - 8,
-            self.header_rect.height
-        )
         txt = self.font.render(self.options[self.current], True, COLOR_TEXT)
-        txt_rect = txt.get_rect(center=text_area.center)
+        txt_rect = txt.get_rect()
+        txt_rect.left = self.header_rect.left + PADDING_X
+        txt_rect.centery = self.header_rect.centery
+        if txt_rect.width > self.header_rect.width - 2 * PADDING_X:
+            txt_rect.width = self.header_rect.width - 2 * PADDING_X
+        if txt_rect.height > self.header_rect.height - 2 * PADDING_Y:
+            txt_rect.height = self.header_rect.height - 2 * PADDING_Y
         screen.blit(txt, txt_rect)
-        # Draw arrow at right with padding
+
+        # Draw arrow
         arrow_x = self.header_rect.right - ARROW_PADDING
         arrow_y = self.header_rect.centery
-        pygame.draw.polygon(screen, COLOR_TEXT, [
-            (arrow_x, arrow_y - ARROW_HEIGHT // 2),
-            (arrow_x + ARROW_WIDTH, arrow_y - ARROW_HEIGHT // 2),
-            (arrow_x + ARROW_WIDTH // 2, arrow_y + ARROW_HEIGHT // 2)
-        ])
+        v_width = 14
+        v_height = 8
+        pygame.draw.lines(screen, COLOR_TEXT, False, [
+            (arrow_x, arrow_y - v_height // 2),
+            (arrow_x + v_width // 2, arrow_y + v_height // 2),
+            (arrow_x + v_width, arrow_y - v_height // 2)
+        ], 3)
 
+        # Draw outline for header
+        pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.header_rect, BUTTON_OUTLINE_THICKNESS, border_radius=DROPDOWN_RADIUS)
+
+        # --- Draw dropdown menu if open ---
         if self.is_open:
+            menu_rect = pygame.Rect(
+                self.header_rect.x,
+                self.header_rect.y + self.header_rect.height,
+                self.header_rect.width,
+                self.header_rect.height * len(self.options)
+            )
+            w, h = menu_rect.size
+
+            # Surface để vẽ các item (không bo góc)
+            content_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+
+            # Mask bo góc
+            mask_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.rect(mask_surf, (255,255,255,255),
+                             mask_surf.get_rect(),
+                             border_radius=DROPDOWN_RADIUS)
+
+            # Tween hover cho từng option
+            if not hasattr(self, 'option_hover_amount'):
+                self.option_hover_amount = [0] * len(self.options)
+
             for i, opt in enumerate(self.options):
                 item_rect = pygame.Rect(
-                    self.header_rect.x,
-                    self.header_rect.y + (i + 1) * self.header_rect.height,
-                    self.header_rect.width,
+                    0,
+                    i * self.header_rect.height,
+                    w,
                     self.header_rect.height
                 )
-                from constants import COLOR_DROPDOWN, lighten_color
-                if not hasattr(self, 'option_hover_amount'):
-                    self.option_hover_amount = [0 for _ in self.options]
-                hovered_item = item_rect.collidepoint(mx, my)
-                # Tween for each option
+                hovered_item = item_rect.move(menu_rect.topleft).collidepoint(mx, my)
                 if hovered_item:
-                    self.option_hover_amount[i] = min(self.option_hover_amount[i] + 8, 40)
+                    self.option_hover_amount[i] = min(self.option_hover_amount[i] + FADE_HOVER_SPEED, 40)
                 else:
-                    self.option_hover_amount[i] = max(self.option_hover_amount[i] - 8, 0)
-                color = lighten_color(COLOR_DROPDOWN, int(self.option_hover_amount[i]))
-                pygame.draw.rect(screen, color, item_rect)
-                # Padding for option text
-                OPTION_PADDING = 12
-                option_area = pygame.Rect(
-                    item_rect.x + OPTION_PADDING,
-                    item_rect.y,
-                    item_rect.width - 2 * OPTION_PADDING,
-                    item_rect.height
-                )
+                    self.option_hover_amount[i] = max(self.option_hover_amount[i] - FADE_HOVER_SPEED, 0)
+                bg = lighten_color(COLOR_DROPDOWN_MENU, int(self.option_hover_amount[i]))
+                pygame.draw.rect(content_surf, bg, item_rect)
+
+                # Text cho option
                 txt2 = self.font.render(opt, True, COLOR_TEXT)
-                txt2_rect = txt2.get_rect(center=option_area.center)
-                screen.blit(txt2, txt2_rect)
+                txt2_rect = txt2.get_rect()
+                txt2_rect.left = item_rect.left + PADDING_X
+                txt2_rect.centery = item_rect.centery
+                content_surf.blit(txt2, txt2_rect)
+
+            # Áp mask bo góc
+            content_surf.blit(mask_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+
+            # Tạo final_surf với nền và viền bo góc
+            final_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.rect(final_surf, COLOR_DROPDOWN_MENU,
+                             final_surf.get_rect(),
+                             border_radius=DROPDOWN_RADIUS)
+            pygame.draw.rect(final_surf, BUTTON_OUTLINE_COLOR,
+                             final_surf.get_rect(),
+                             BUTTON_OUTLINE_THICKNESS,
+                             border_radius=DROPDOWN_RADIUS)
+
+            # Blit content lên final_surf rồi ra màn hình
+            final_surf.blit(content_surf, (0, 0))
+            screen.blit(final_surf, menu_rect.topleft)
 
     def is_clicked(self, mx, my):
         
