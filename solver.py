@@ -105,3 +105,36 @@ def find_blank(board):
             if board[r][c] == 8:
                 return r, c
     return None, None
+
+
+import heapq
+
+def ucs(start_board):
+    start = copy.deepcopy(start_board)
+    visited = set()
+    heap = []
+    
+    # (cost, board, path)
+    heapq.heappush(heap, (0, start, []))
+
+    while heap:
+        cost, board, path = heapq.heappop(heap)
+        key = serialize(board)
+        if key in visited:
+            continue
+        visited.add(key)
+
+        if board == GOAL_STATE:
+            return path
+
+        br, bc = find_blank(board)
+        for dr, dc in MOVES:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < 3 and 0 <= nc < 3:
+                new_board = copy.deepcopy(board)
+                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
+                new_key = serialize(new_board)
+                if new_key not in visited:
+                    heapq.heappush(heap, (cost + 1, new_board, path + [(nr, nc)]))
+
+    return []  # không tìm thấy lời giải
