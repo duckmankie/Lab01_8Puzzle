@@ -309,8 +309,44 @@ def beam_search(start_board, beam_width=3):
     return [], nodes_expanded, 0, end_time - start_time, 0
 
 def dijkstra(start_board):
-    return ucs(start_board) 
+    start = copy.deepcopy(start_board)
+    visited = set()
+    heap = []
+    nodes_expanded = 0
+    start_time = time.perf_counter()
 
+    # Mỗi phần tử: (tổng chi phí, board hiện tại, đường đi [(r, c), ...])
+    heapq.heappush(heap, (0, start, []))  # Chi phí ban đầu là 0
+
+    while heap:
+        cost, board, path = heapq.heappop(heap)
+        key = serialize(board)
+
+        if key in visited:
+            continue
+        visited.add(key)
+        nodes_expanded += 1
+
+        if board == GOAL_STATE:
+            end_time = time.perf_counter()
+            solve_time = end_time - start_time
+            frontier_nodes = len(heap)
+            return path, nodes_expanded, cost, solve_time, frontier_nodes
+
+        br, bc = find_blank(board)
+
+        for dr, dc in MOVES:
+            nr, nc = br + dr, bc + dc
+            if 0 <= nr < 3 and 0 <= nc < 3:
+                new_board = copy.deepcopy(board)
+                new_board[br][bc], new_board[nr][nc] = new_board[nr][nc], new_board[br][bc]
+                new_key = serialize(new_board)
+
+                if new_key not in visited:
+                    heapq.heappush(heap, (cost + 1, new_board, path + [(nr, nc)]))
+
+    end_time = time.perf_counter()
+    return [], nodes_expanded, 0, end_time - start_time, len(heap)
 def bidirectional_search(start_board):
     start = copy.deepcopy(start_board)
     goal = copy.deepcopy(GOAL_STATE)
