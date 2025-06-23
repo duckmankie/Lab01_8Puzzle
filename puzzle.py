@@ -295,6 +295,8 @@ class EightPuzzle:
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = bidirectional_search(self.board)
         elif algo == "Dijkstra":
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = dijkstra(self.board)
+        elif algo == "Beam Search":
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = beam_search(self.board)
         else:
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = [], 0, 0, 0.0, 0
         self.solution_path = path

@@ -63,4 +63,4 @@ CHECKBOX_Y = WINDOW_HEIGHT - 40
 LABEL_X = CHECKBOX_X + CHECKBOX_SIZE + 10
 LABEL_Y = CHECKBOX_Y - 2
 
-ALGORITHMS = ["BFS", "DFS", "A*", "Dijkstra", "UCS", "IDDFS", "IDA*", "Bi-dir Search"]
+ALGORITHMS = ["BFS", "DFS", "A*", "Dijkstra", "UCS", "IDDFS", "IDA*", "Bi-dir Search", "Beam Search"]
