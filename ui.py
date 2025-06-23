@@ -1,18 +1,11 @@
-
-
 import pygame
 from constants import *
-
 from puzzle import pixel_to_grid
 
 def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
-    # Draw solve_btn với tween color chỉ khi đang solve, còn lại để None để dùng COLOR_BUTTON mặc định
     solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=solve_btn.color_override)
-    # Không vẽ overlay mờ khi disabled nữa, hiệu ứng disabled đã xử lý trong Button.draw
-    # Next/Reset buttons
     next_btn.draw(screen, disabled_hover=False)
     reset_btn.draw(screen, disabled_hover=False)
-    # Vẽ chữ nhỏ "choose algorithm" phía trên, bên trái dropdown
     font_label = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 18)
     label_surface = font_label.render("Choose Algorithm", True, COLOR_TEXT)
     label_x = dropdown.header_rect.x
@@ -20,10 +13,8 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
     screen.blit(label_surface, (label_x, label_y))
     dropdown.draw(screen)
     checkbox.draw(screen)
-    # Draw thumbnails with horizontal scroll
     thumb_y = 20
     thumb_x = RIGHT_PANEL_X + 50
-    # Lưu lại vị trí này để dùng cho event
     puzzle._thumb_x = thumb_x
     puzzle._thumb_y = thumb_y
     if not hasattr(puzzle, 'thumb_scroll_offset'):
@@ -32,17 +23,14 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
         puzzle.thumb_scroll_anim = 0.0
     max_offset = max(0, len(puzzle.templates) - THUMBS_PER_ROW)
     puzzle.thumb_scroll_offset = min(max(0, puzzle.thumb_scroll_offset), max_offset)
-    # Tween scroll animation
     SCROLL_ANIM_SPEED = 0.25
     if abs(puzzle.thumb_scroll_anim - puzzle.thumb_scroll_offset) > 0.01:
         puzzle.thumb_scroll_anim += (puzzle.thumb_scroll_offset - puzzle.thumb_scroll_anim) * SCROLL_ANIM_SPEED
     else:
         puzzle.thumb_scroll_anim = float(puzzle.thumb_scroll_offset)
-    # --- Draw frame (clip descendants) ---
     frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
     frame_height = IMAGE_THUMB_SIZE
     frame_surf = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
-    # Draw all thumbs into frame_surf
     for i in range(len(puzzle.templates)):
         offset_x = (i - puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
         rect = pygame.Rect(
@@ -52,14 +40,11 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
             IMAGE_THUMB_SIZE
         )
         if rect.right < 0 or rect.left > frame_width:
-            continue  # skip thumbs outside frame
+            continue
         frame_surf.blit(puzzle.thumb_surfaces[i], rect.topleft)
         if i == puzzle.selected_index:
             pygame.draw.rect(frame_surf, COLOR_HIGHLIGHT, rect, 3)
-    # (Không vẽ border cho frame scroll box)
-    # Blit frame_surf to screen
     screen.blit(frame_surf, (thumb_x, thumb_y))
-    # Draw left/right scroll buttons if needed
     arrow_size = 18
     arrow_offset_y = thumb_y + IMAGE_THUMB_SIZE // 2 - arrow_size // 2
     arrow_center_y = thumb_y + IMAGE_THUMB_SIZE // 2
@@ -69,7 +54,6 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
         puzzle.arrow_hover_right = 0
     if len(puzzle.templates) > THUMBS_PER_ROW:
         mx, my = pygame.mouse.get_pos()
-        # Left arrow
         left_rect = pygame.Rect(thumb_x - arrow_size - 8, arrow_offset_y, arrow_size, arrow_size)
         left_hovered = left_rect.collidepoint(mx, my)
         if left_hovered:
@@ -83,7 +67,6 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
             (left_rect.left, left_rect.centery),
             (left_rect.right, left_rect.bottom)
         ])
-        # Right arrow
         right_rect = pygame.Rect(thumb_x + THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) + 8, arrow_offset_y, arrow_size, arrow_size)
         right_hovered = right_rect.collidepoint(mx, my)
         if right_hovered:
@@ -102,14 +85,12 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
     action = None
     if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
         mx, my = pygame.mouse.get_pos()
-        # Dropdown click handling
         if not is_solving:
             dd_choice = dropdown.is_clicked(mx, my)
             if dd_choice is not None:
                 puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                 action = 'algorithm_changed'
                 return is_solving, action
-        # Dropdown close if click outside
         if dropdown.is_open and not is_solving:
             dropdown_rect = dropdown.header_rect.copy()
             dropdown_rect.height += dropdown.header_rect.height * (len(dropdown.options))
@@ -117,7 +98,6 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
                 dropdown.is_open = False
             else:
                 return is_solving, action
-        # Puzzle grid click
         if (not is_solving and PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
             PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE and
             not puzzle.in_reset and not puzzle.in_fade):
@@ -126,11 +106,9 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
                 puzzle.start_move(gr, gc)
                 action = 'board_changed'
                 return is_solving, action
-        # Checkbox click
         if checkbox.is_clicked(mx, my):
             puzzle.toggle_numbers()
             return is_solving, action
-        # Buttons click
         if solve_btn.is_clicked(mx, my):
             if not is_solving:
                 is_solving = True
@@ -150,14 +128,11 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
             puzzle.shuffle()
             action = 'reset'
             return is_solving, action
-        # Thumbnail click with scroll
         if not is_solving:
-            # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
             thumb_x = getattr(puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
             thumb_y = getattr(puzzle, '_thumb_y', 20)
             if not hasattr(puzzle, 'thumb_scroll_offset'):
                 puzzle.thumb_scroll_offset = 0
-            # Check left/right arrow click
             arrow_size = 18
             arrow_offset_y = thumb_y + IMAGE_THUMB_SIZE // 2 - arrow_size // 2
             if len(puzzle.templates) > THUMBS_PER_ROW:
@@ -169,7 +144,6 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
                 if right_rect.collidepoint(mx, my) and puzzle.thumb_scroll_offset < max(0, len(puzzle.templates) - THUMBS_PER_ROW):
                     puzzle.thumb_scroll_offset += 1
                     return is_solving, action
-            # Tính lại vị trí click trong frame
             frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
             frame_height = IMAGE_THUMB_SIZE
             rel_mx = mx - thumb_x
@@ -205,12 +179,10 @@ class GameUI:
         self.locked_interaction = False
 
     def draw(self):
-        # --- Tween logic cho Solve button ---
         if not hasattr(self.solve_btn, 'prev_state'):
             self.solve_btn.prev_state = 'normal'
         if not hasattr(self, 'solve_btn_color_progress'):
             self.solve_btn_color_progress = 0.0
-        # Xác định trạng thái hiện tại
         if self.puzzle.completed:
             curr_state = 'solved'
         elif self.puzzle.is_calculating:
@@ -221,18 +193,12 @@ class GameUI:
             curr_state = 'disabled'
         else:
             curr_state = 'normal'
-        # Tween màu khi chuyển trạng thái
-        # Từ normal -> stop: tween sang đỏ
-        # Từ stop -> normal: tween về màu gốc
-        # Từ enabled <-> disabled: tween fade tối/sáng
         SOLVE_COLOR_NORMAL = COLOR_BUTTON
         SOLVE_COLOR_STOP = (244,60,68)
         SOLVE_COLOR_DISABLED = darken_color(COLOR_BUTTON, 40)
-        # Xử lý tween
         if self.solve_btn.prev_state != curr_state:
             self.solve_btn_color_progress = 0.0
         if curr_state == 'stop':
-            # Tween sang đỏ
             if self.solve_btn_color_progress < 1.0:
                 self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
             color_now = tuple(
@@ -240,7 +206,6 @@ class GameUI:
                 for i in range(3)
             )
         elif curr_state == 'normal':
-            # Tween về màu gốc
             if self.solve_btn_color_progress > 0.0:
                 self.solve_btn_color_progress = max(0.0, self.solve_btn_color_progress - self.SOLVE_BTN_TWEEN_SPEED)
             color_now = tuple(
@@ -248,7 +213,6 @@ class GameUI:
                 for i in range(3)
             )
         elif curr_state == 'disabled':
-            # Tween fade tối
             if self.solve_btn_color_progress < 1.0:
                 self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
             color_now = tuple(
@@ -261,7 +225,6 @@ class GameUI:
             color_now = COLOR_BG
         else:
             color_now = SOLVE_COLOR_NORMAL
-        # Cập nhật trạng thái solve_btn
         if curr_state == 'solved':
             self.solve_btn.label = "Solved"
             self.solve_btn.disabled = True
@@ -280,29 +243,22 @@ class GameUI:
             self.solve_btn.outline_override = None
         self.solve_btn.color_override = color_now
         self.solve_btn.prev_state = curr_state
-        # Next button chỉ hoạt động khi đã calculate xong, chưa completed, không auto_solving
         self.next_btn.disabled = (
             self.puzzle.is_calculating or
             not self.puzzle.solution_path or
             self.puzzle.completed or
             self.puzzle.auto_solving
         )
-        # Reset button chỉ enable khi không calculating, không auto_solving, không completed
         self.reset_btn.disabled = (
             self.puzzle.is_calculating or
             self.puzzle.auto_solving
         )
-        # Vẽ UI, truyền trạng thái disable cho solve_btn
         draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, self.solve_btn.color_override, solve_btn_disabled=self.solve_btn.disabled)
-        # Ensure the button is truly not clickable when disabled
-        # self.solve_btn.disabled = solve_disabled  # Đã loại bỏ solve_disabled, không cần dòng này nữa
-
-        # --- Result display ---
         font_result = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
         x = RIGHT_PANEL_X + 20
-        y = 390  # Move further down
+        y = 390
         color = COLOR_TEXT
-        line_spacing = 14  # Extra space between lines
+        line_spacing = 14
         if self.is_solving:
             steps_str = ""
             expanded_str = ""
@@ -326,12 +282,9 @@ class GameUI:
             surf = font_result.render(line, True, color)
             self.screen.blit(surf, (x, y))
             y += surf.get_height() + line_spacing
-
-        # Draw dropdown last so it overlays everything
         self.dropdown.draw(self.screen)
 
     def handle_click(self, mx, my):
-        # Chỉ xử lý dropdown khi KHÔNG đang solving
         if (self.dropdown.header_rect.collidepoint(mx, my) or self.dropdown.is_open) and not self.puzzle.auto_solving:
             was_open = self.dropdown.is_open
             dd_choice = self.dropdown.is_clicked(mx, my)
@@ -346,20 +299,14 @@ class GameUI:
                     self.is_solving = False
                     self.locked_interaction = False
                 return
-            # Nếu vừa click header để mở menu, không return, cho phép xử lý tiếp các nút khác
             if not was_open and self.dropdown.is_open:
                 return
-            # Nếu menu đang mở nhưng click ra ngoài, đóng menu
             if was_open and not self.dropdown.is_open:
                 return
-        # Nếu locked_interaction, chỉ chặn các thao tác với board, template, dropdown
         if self.locked_interaction:
-            # Nếu vẫn đang auto_solving thì vẫn chặn như cũ
             if self.puzzle.auto_solving:
-                # Chặn đổi thuật toán
                 if self.dropdown.header_rect.collidepoint(mx, my):
                     return
-                # Chặn đổi template (thumbnail, scroll)
                 thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
                 thumb_y = getattr(self.puzzle, '_thumb_y', 20)
                 frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
@@ -378,12 +325,10 @@ class GameUI:
                         continue
                     if rect.collidepoint(rel_mx, rel_my):
                         return
-                # Chặn di chuyển ô trên board
                 if (PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
                     PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE):
                     return
             else:
-                # Đã stop giữa chừng, cho phép chọn lại template/thuật toán, nếu chọn thì reset
                 if self.dropdown.header_rect.collidepoint(mx, my):
                     current_algo = self.dropdown.options[self.dropdown.current]
                     dd_choice = self.dropdown.is_clicked(mx, my)
@@ -396,7 +341,6 @@ class GameUI:
                             self.solve_btn.color_override = None
                             self.is_solving = False
                             self.locked_interaction = False
-                            # Đồng bộ dropdown.current với thuật toán mới
                             self.dropdown.current = dd_choice
                     return
                 thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
@@ -422,11 +366,9 @@ class GameUI:
                         self.is_solving = False
                         self.locked_interaction = False
                         return
-                # Chặn di chuyển ô trên board
                 if (PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
                     PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE):
                     return
-        # Nếu đã completed, unlock toàn bộ tương tác (reset locked_interaction)
         if self.puzzle.completed:
             self.locked_interaction = False
             if self.reset_btn.is_clicked(mx, my):
@@ -440,13 +382,11 @@ class GameUI:
                 self.puzzle.toggle_numbers()
                 return
             return
-        # Dropdown click chỉ hoạt động khi không calculating, không auto_solving
         if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
             dd_choice = self.dropdown.is_clicked(mx, my)
             if dd_choice is not None:
                 self.puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                 return
-        # Dropdown close if click outside
         if self.dropdown.is_open and not self.is_solving:
             dropdown_rect = self.dropdown.header_rect.copy()
             dropdown_rect.height += self.dropdown.header_rect.height * (len(self.dropdown.options))
@@ -454,7 +394,6 @@ class GameUI:
                 self.dropdown.is_open = False
             else:
                 return
-        # Puzzle grid click
         if (not self.is_solving and PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
             PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE and
             not self.puzzle.in_reset and not self.puzzle.in_fade):
@@ -462,11 +401,9 @@ class GameUI:
             if gr is not None:
                 self.puzzle.start_move(gr, gc)
                 return
-        # Checkbox click
         if self.checkbox.is_clicked(mx, my):
             self.puzzle.toggle_numbers()
             return
-        # Buttons click
         if self.solve_btn.is_clicked(mx, my):
             if self.puzzle.is_calculating or self.puzzle.completed:
                 return
@@ -489,15 +426,12 @@ class GameUI:
             return
         if self.reset_btn.is_clicked(mx, my) and not self.is_solving:
             self.puzzle.shuffle()
-            # Enable lại solve_btn
             self.solve_btn.label = "Solve"
             self.solve_btn.color_override = None
             self.is_solving = False
             self.locked_interaction = False
             return
-        # Thumbnail click với scroll chỉ hoạt động khi không calculating, không auto_solving, không completed
         if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving and not self.puzzle.completed:
-            # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
             thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
             thumb_y = getattr(self.puzzle, '_thumb_y', 20)
             if not hasattr(self.puzzle, 'thumb_scroll_offset'):
@@ -513,7 +447,6 @@ class GameUI:
                 if right_rect.collidepoint(mx, my) and self.puzzle.thumb_scroll_offset < max(0, len(self.puzzle.templates) - THUMBS_PER_ROW):
                     self.puzzle.thumb_scroll_offset += 1
                     return
-            # Tính lại vị trí click trong frame
             frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
             frame_height = IMAGE_THUMB_SIZE
             rel_mx = mx - thumb_x
@@ -530,7 +463,6 @@ class GameUI:
                     continue
                 if rect.collidepoint(rel_mx, rel_my):
                     self.puzzle.prepare_fade(i)
-                    # Enable lại solve_btn khi đổi puzzle
                     self.solve_btn.label = "Solve"
                     self.solve_btn.color_override = None
                     self.is_solving = False
@@ -541,44 +473,36 @@ class Button:
         self.rect = pygame.Rect(x, y, w, h)
         self.label = label
         self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 22)
-        self.hover_amount = 0  # For tween effect
+        self.hover_amount = 0
         self.color_override = color_override
         self.disabled = False
 
     def draw(self, screen, disabled_hover=False, disabled=False, color_override=None):
         mx, my = pygame.mouse.get_pos()
-        # Use self.disabled if set, or fallback to argument
         is_disabled = getattr(self, 'disabled', False) or disabled
         hovered = self.rect.collidepoint(mx, my) and not disabled_hover and not is_disabled
         from constants import lighten_color
-        # Chọn màu nền
         base_color = self.color_override if self.color_override is not None else COLOR_BUTTON
         if color_override is not None:
             base_color = color_override
         from constants import darken_color
-        # Nếu disabled thì làm tối màu (dùng darken_color)
         if is_disabled:
             base_color = darken_color(base_color, 40)
-        # Tween hover effect
         if hovered:
             self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
         else:
             self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
         color = lighten_color(base_color, int(self.hover_amount) if not is_disabled else 0)
         pygame.draw.rect(screen, color, self.rect, border_radius=BUTTON_RADIUS)
-        # Outline động
         outline_color = getattr(self, 'outline_override', None) or BUTTON_OUTLINE_COLOR
         pygame.draw.rect(screen, outline_color, self.rect, BUTTON_OUTLINE_THICKNESS, border_radius=BUTTON_RADIUS)
-        # Nếu disabled thì text cũng tối đi
         txt_color = COLOR_TEXT if not is_disabled else darken_color(COLOR_TEXT, 100)
         txt = self.font.render(self.label, True, txt_color)
-        # Padding cho text
         PADDING_X = 12
         PADDING_Y = 6
         txt_rect = txt.get_rect()
         txt_rect.centerx = self.rect.centerx
         txt_rect.centery = self.rect.centery
-        # Đảm bảo text không sát viền button
         if txt_rect.width > self.rect.width - 2 * PADDING_X:
             txt_rect.width = self.rect.width - 2 * PADDING_X
         if txt_rect.height > self.rect.height - 2 * PADDING_Y:
@@ -586,7 +510,6 @@ class Button:
         screen.blit(txt, txt_rect)
 
     def is_clicked(self, mx, my):
-        # If truly disabled, never clickable
         if getattr(self, 'disabled', False):
             return False
         return self.rect.collidepoint(mx, my)
@@ -604,16 +527,14 @@ class Checkbox:
         hovered = self.rect.collidepoint(mx, my)
         from constants import lighten_color
         color = lighten_color(CHECKBOX_BUTTON, 40) if hovered else CHECKBOX_BUTTON
-        pygame.draw.rect(screen, color, self.rect)  # Không bo góc
+        pygame.draw.rect(screen, color, self.rect)
         if self.is_checked:
-            
             pygame.draw.line(screen, COLOR_TEXT,
                              (self.rect.x + 4, self.rect.y + self.rect.height // 2),
                              (self.rect.x + self.rect.width // 2, self.rect.y + self.rect.height - 4), 3)
             pygame.draw.line(screen, COLOR_TEXT,
                              (self.rect.x + self.rect.width // 2, self.rect.y + self.rect.height - 4),
                              (self.rect.x + self.rect.width - 4, self.rect.y + 4), 3)
-        # Căn label ngang hàng với tick box
         lbl = self.font.render(self.label, True, COLOR_TEXT)
         label_y = self.rect.y + (self.rect.height - lbl.get_height()) // 2
         screen.blit(lbl, (self.rect.x + self.rect.width + 8, label_y))
@@ -632,13 +553,11 @@ class Dropdown:
         self.current = 0
         self.is_open = False
         self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
-        self.hover_amount = 0  # For tween effect
+        self.hover_amount = 0
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
         from constants import lighten_color
-
-        # --- Draw dropdown header (button) ---
         hovered = self.header_rect.collidepoint(mx, my)
         if hovered:
             self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
@@ -646,8 +565,6 @@ class Dropdown:
             self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
         color = lighten_color(COLOR_DROPDOWN_BUTTON, int(self.hover_amount))
         pygame.draw.rect(screen, color, self.header_rect, border_radius=DROPDOWN_RADIUS)
-
-        # Draw text in header
         PADDING_X = 12
         PADDING_Y = 6
         ARROW_PADDING = 35
@@ -660,8 +577,6 @@ class Dropdown:
         if txt_rect.height > self.header_rect.height - 2 * PADDING_Y:
             txt_rect.height = self.header_rect.height - 2 * PADDING_Y
         screen.blit(txt, txt_rect)
-
-        # Draw arrow
         arrow_x = self.header_rect.right - ARROW_PADDING
         arrow_y = self.header_rect.centery
         v_width = 14
@@ -671,11 +586,6 @@ class Dropdown:
             (arrow_x + v_width // 2, arrow_y + v_height // 2),
             (arrow_x + v_width, arrow_y - v_height // 2)
         ], 3)
-
-        # Draw outline for header
-        #pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.header_rect, BUTTON_OUTLINE_THICKNESS, border_radius=DROPDOWN_RADIUS)
-
-        # --- Draw dropdown menu if open ---
         if self.is_open:
             menu_rect = pygame.Rect(
                 self.header_rect.x,
@@ -684,20 +594,13 @@ class Dropdown:
                 self.header_rect.height * len(self.options)
             )
             w, h = menu_rect.size
-
-            # Surface để vẽ các item (không bo góc)
             content_surf = pygame.Surface((w, h), pygame.SRCALPHA)
-
-            # Mask bo góc
             mask_surf = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.rect(mask_surf, (255,255,255,255),
                              mask_surf.get_rect(),
                              border_radius=DROPDOWN_RADIUS)
-
-            # Tween hover cho từng option
             if not hasattr(self, 'option_hover_amount'):
                 self.option_hover_amount = [0] * len(self.options)
-
             for i, opt in enumerate(self.options):
                 item_rect = pygame.Rect(
                     0,
@@ -712,18 +615,12 @@ class Dropdown:
                     self.option_hover_amount[i] = max(self.option_hover_amount[i] - FADE_HOVER_SPEED, 0)
                 bg = lighten_color(COLOR_DROPDOWN_MENU, int(self.option_hover_amount[i]))
                 pygame.draw.rect(content_surf, bg, item_rect)
-
-                # Text cho option
                 txt2 = self.font.render(opt, True, COLOR_TEXT)
                 txt2_rect = txt2.get_rect()
                 txt2_rect.left = item_rect.left + PADDING_X
                 txt2_rect.centery = item_rect.centery
                 content_surf.blit(txt2, txt2_rect)
-
-            # Áp mask bo góc
             content_surf.blit(mask_surf, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-
-            # Tạo final_surf với nền và viền bo góc
             final_surf = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.rect(final_surf, COLOR_DROPDOWN_MENU,
                              final_surf.get_rect(),
@@ -732,17 +629,13 @@ class Dropdown:
                              final_surf.get_rect(),
                              BUTTON_OUTLINE_THICKNESS,
                              border_radius=DROPDOWN_RADIUS)
-
-            # Blit content lên final_surf rồi ra màn hình
             final_surf.blit(content_surf, (0, 0))
             screen.blit(final_surf, menu_rect.topleft)
 
     def is_clicked(self, mx, my):
-        
         if self.header_rect.collidepoint(mx, my):
             self.is_open = not self.is_open
-            return None  
-        
+            return None
         if self.is_open:
             for i, _ in enumerate(self.options):
                 item_rect = pygame.Rect(
