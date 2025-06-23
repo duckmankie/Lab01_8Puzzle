@@ -253,6 +253,7 @@ class GameUI:
             self.puzzle.is_calculating or
             self.puzzle.auto_solving
         )
+        self.dropdown.disabled = self.puzzle.is_calculating or self.puzzle.auto_solving
         draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, self.solve_btn.color_override, solve_btn_disabled=self.solve_btn.disabled)
         font_result = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
         x = RIGHT_PANEL_X + 20
@@ -285,7 +286,7 @@ class GameUI:
         self.dropdown.draw(self.screen)
 
     def handle_click(self, mx, my):
-        if (self.dropdown.header_rect.collidepoint(mx, my) or self.dropdown.is_open) and not self.puzzle.auto_solving:
+        if (self.dropdown.header_rect.collidepoint(mx, my) or self.dropdown.is_open) and not (self.puzzle.auto_solving or self.puzzle.is_calculating):
             was_open = self.dropdown.is_open
             dd_choice = self.dropdown.is_clicked(mx, my)
             if was_open and dd_choice is not None:
@@ -387,7 +388,7 @@ class GameUI:
             if dd_choice is not None:
                 self.puzzle.selected_algorithm = ALGORITHMS[dd_choice]
                 return
-        if self.dropdown.is_open and not self.is_solving:
+        if self.dropdown.is_open and not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
             dropdown_rect = self.dropdown.header_rect.copy()
             dropdown_rect.height += self.dropdown.header_rect.height * (len(self.dropdown.options))
             if not dropdown_rect.collidepoint(mx, my):
@@ -401,7 +402,7 @@ class GameUI:
             if gr is not None:
                 self.puzzle.start_move(gr, gc)
                 return
-        if self.checkbox.is_clicked(mx, my):
+        if not self.puzzle.is_calculating and not self.puzzle.auto_solving and self.checkbox.is_clicked(mx, my):
             self.puzzle.toggle_numbers()
             return
         if self.solve_btn.is_clicked(mx, my):
@@ -521,12 +522,15 @@ class Checkbox:
         self.label = label
         self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 18)
         self.is_checked = False
+        self.disabled = False
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
         hovered = self.rect.collidepoint(mx, my)
-        from constants import lighten_color
-        color = lighten_color(CHECKBOX_BUTTON, 40) if hovered else CHECKBOX_BUTTON
+        from constants import lighten_color, darken_color
+        color = lighten_color(CHECKBOX_BUTTON, 40) if hovered and not self.disabled else CHECKBOX_BUTTON
+        if self.disabled:
+            color = darken_color(color, 40)
         pygame.draw.rect(screen, color, self.rect)
         if self.is_checked:
             pygame.draw.line(screen, COLOR_TEXT,
@@ -535,11 +539,14 @@ class Checkbox:
             pygame.draw.line(screen, COLOR_TEXT,
                              (self.rect.x + self.rect.width // 2, self.rect.y + self.rect.height - 4),
                              (self.rect.x + self.rect.width - 4, self.rect.y + 4), 3)
-        lbl = self.font.render(self.label, True, COLOR_TEXT)
+        lbl_color = COLOR_TEXT if not self.disabled else darken_color(COLOR_TEXT, 100)
+        lbl = self.font.render(self.label, True, lbl_color)
         label_y = self.rect.y + (self.rect.height - lbl.get_height()) // 2
         screen.blit(lbl, (self.rect.x + self.rect.width + 8, label_y))
 
     def is_clicked(self, mx, my):
+        if self.disabled:
+            return False
         if self.rect.collidepoint(mx, my):
             self.is_checked = not self.is_checked
             return True
@@ -554,21 +561,25 @@ class Dropdown:
         self.is_open = False
         self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
         self.hover_amount = 0
+        self.disabled = False
 
     def draw(self, screen):
         mx, my = pygame.mouse.get_pos()
-        from constants import lighten_color
+        from constants import lighten_color, darken_color
         hovered = self.header_rect.collidepoint(mx, my)
-        if hovered:
+        color = lighten_color(COLOR_DROPDOWN_BUTTON, int(self.hover_amount))
+        if self.disabled:
+            color = darken_color(color, 40)
+        if hovered and not self.disabled:
             self.hover_amount = min(self.hover_amount + FADE_HOVER_SPEED, 40)
         else:
             self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
-        color = lighten_color(COLOR_DROPDOWN_BUTTON, int(self.hover_amount))
         pygame.draw.rect(screen, color, self.header_rect, border_radius=DROPDOWN_RADIUS)
         PADDING_X = 12
         PADDING_Y = 6
         ARROW_PADDING = 35
-        txt = self.font.render(self.options[self.current], True, COLOR_TEXT)
+        txt_color = COLOR_TEXT if not self.disabled else darken_color(COLOR_TEXT, 100)
+        txt = self.font.render(self.options[self.current], True, txt_color)
         txt_rect = txt.get_rect()
         txt_rect.left = self.header_rect.left + PADDING_X
         txt_rect.centery = self.header_rect.centery
@@ -581,12 +592,13 @@ class Dropdown:
         arrow_y = self.header_rect.centery
         v_width = 14
         v_height = 8
-        pygame.draw.lines(screen, COLOR_TEXT, False, [
+        arrow_color = COLOR_TEXT if not self.disabled else darken_color(COLOR_TEXT, 100)
+        pygame.draw.lines(screen, arrow_color, False, [
             (arrow_x, arrow_y - v_height // 2),
             (arrow_x + v_width // 2, arrow_y + v_height // 2),
             (arrow_x + v_width, arrow_y - v_height // 2)
         ], 3)
-        if self.is_open:
+        if self.is_open and not self.disabled:
             menu_rect = pygame.Rect(
                 self.header_rect.x,
                 self.header_rect.y + self.header_rect.height,
@@ -615,7 +627,8 @@ class Dropdown:
                     self.option_hover_amount[i] = max(self.option_hover_amount[i] - FADE_HOVER_SPEED, 0)
                 bg = lighten_color(COLOR_DROPDOWN_MENU, int(self.option_hover_amount[i]))
                 pygame.draw.rect(content_surf, bg, item_rect)
-                txt2 = self.font.render(opt, True, COLOR_TEXT)
+                txt2_color = COLOR_TEXT if not self.disabled else darken_color(COLOR_TEXT, 100)
+                txt2 = self.font.render(opt, True, txt2_color)
                 txt2_rect = txt2.get_rect()
                 txt2_rect.left = item_rect.left + PADDING_X
                 txt2_rect.centery = item_rect.centery
@@ -633,6 +646,8 @@ class Dropdown:
             screen.blit(final_surf, menu_rect.topleft)
 
     def is_clicked(self, mx, my):
+        if self.disabled:
+            return None
         if self.header_rect.collidepoint(mx, my):
             self.is_open = not self.is_open
             return None
