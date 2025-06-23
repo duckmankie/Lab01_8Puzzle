@@ -53,7 +53,7 @@ ALL_TEMPLATE_FILES = [
     os.path.join(TEMPLATE_DIR, fname)
     for fname in sorted(os.listdir(TEMPLATE_DIR))
     if fname.lower().endswith((".png", ".jpg", ".jpeg"))
-][:5]  
+]  
 
 IMAGE_THUMB_SIZE = 80   
 THUMBS_PER_ROW = 5      

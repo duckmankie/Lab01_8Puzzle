@@ -23,22 +23,82 @@ def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, 
     screen.blit(label_surface, (label_x, label_y))
     dropdown.draw(screen)
     checkbox.draw(screen)
-    # Draw thumbnails
+    # Draw thumbnails with horizontal scroll
     thumb_y = 20
-    thumb_x = RIGHT_PANEL_X + 20
-    for i in range(THUMBS_PER_ROW):
-        idx = i
-        if idx >= len(puzzle.templates):
-            break
+    thumb_x = RIGHT_PANEL_X + 50
+    # Lưu lại vị trí này để dùng cho event
+    puzzle._thumb_x = thumb_x
+    puzzle._thumb_y = thumb_y
+    if not hasattr(puzzle, 'thumb_scroll_offset'):
+        puzzle.thumb_scroll_offset = 0
+    if not hasattr(puzzle, 'thumb_scroll_anim'):
+        puzzle.thumb_scroll_anim = 0.0
+    max_offset = max(0, len(puzzle.templates) - THUMBS_PER_ROW)
+    puzzle.thumb_scroll_offset = min(max(0, puzzle.thumb_scroll_offset), max_offset)
+    # Tween scroll animation
+    SCROLL_ANIM_SPEED = 0.25
+    if abs(puzzle.thumb_scroll_anim - puzzle.thumb_scroll_offset) > 0.01:
+        puzzle.thumb_scroll_anim += (puzzle.thumb_scroll_offset - puzzle.thumb_scroll_anim) * SCROLL_ANIM_SPEED
+    else:
+        puzzle.thumb_scroll_anim = float(puzzle.thumb_scroll_offset)
+    # --- Draw frame (clip descendants) ---
+    frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
+    frame_height = IMAGE_THUMB_SIZE
+    frame_surf = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+    # Draw all thumbs into frame_surf
+    for i in range(len(puzzle.templates)):
+        offset_x = (i - puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
         rect = pygame.Rect(
-            thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
-            thumb_y,
+            int(offset_x),
+            0,
             IMAGE_THUMB_SIZE,
             IMAGE_THUMB_SIZE
         )
-        screen.blit(puzzle.thumb_surfaces[idx], rect.topleft)
-        if idx == puzzle.selected_index:
-            pygame.draw.rect(screen, COLOR_HIGHLIGHT, rect, 3)
+        if rect.right < 0 or rect.left > frame_width:
+            continue  # skip thumbs outside frame
+        frame_surf.blit(puzzle.thumb_surfaces[i], rect.topleft)
+        if i == puzzle.selected_index:
+            pygame.draw.rect(frame_surf, COLOR_HIGHLIGHT, rect, 3)
+    # (Không vẽ border cho frame scroll box)
+    # Blit frame_surf to screen
+    screen.blit(frame_surf, (thumb_x, thumb_y))
+    # Draw left/right scroll buttons if needed
+    arrow_size = 18
+    arrow_offset_y = thumb_y + IMAGE_THUMB_SIZE // 2 - arrow_size // 2
+    arrow_center_y = thumb_y + IMAGE_THUMB_SIZE // 2
+    if not hasattr(puzzle, 'arrow_hover_left'):
+        puzzle.arrow_hover_left = 0
+    if not hasattr(puzzle, 'arrow_hover_right'):
+        puzzle.arrow_hover_right = 0
+    if len(puzzle.templates) > THUMBS_PER_ROW:
+        mx, my = pygame.mouse.get_pos()
+        # Left arrow
+        left_rect = pygame.Rect(thumb_x - arrow_size - 8, arrow_offset_y, arrow_size, arrow_size)
+        left_hovered = left_rect.collidepoint(mx, my)
+        if left_hovered:
+            puzzle.arrow_hover_left = min(puzzle.arrow_hover_left + 8, 40)
+        else:
+            puzzle.arrow_hover_left = max(puzzle.arrow_hover_left - 8, 0)
+        from constants import lighten_color
+        left_color = lighten_color(COLOR_TEXT, puzzle.arrow_hover_left)
+        pygame.draw.polygon(screen, left_color, [
+            (left_rect.right, left_rect.top),
+            (left_rect.left, left_rect.centery),
+            (left_rect.right, left_rect.bottom)
+        ])
+        # Right arrow
+        right_rect = pygame.Rect(thumb_x + THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) + 8, arrow_offset_y, arrow_size, arrow_size)
+        right_hovered = right_rect.collidepoint(mx, my)
+        if right_hovered:
+            puzzle.arrow_hover_right = min(puzzle.arrow_hover_right + 8, 40)
+        else:
+            puzzle.arrow_hover_right = max(puzzle.arrow_hover_right - 8, 0)
+        right_color = lighten_color(COLOR_TEXT, puzzle.arrow_hover_right)
+        pygame.draw.polygon(screen, right_color, [
+            (right_rect.left, right_rect.top),
+            (right_rect.right, right_rect.centery),
+            (right_rect.left, right_rect.bottom)
+        ])
 
 
 def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, checkbox, is_solving):
@@ -93,22 +153,42 @@ def handle_ui_event(event, puzzle, solve_btn, next_btn, reset_btn, dropdown, che
             puzzle.shuffle()
             action = 'reset'
             return is_solving, action
-        # Thumbnail click
+        # Thumbnail click with scroll
         if not is_solving:
-            thumb_y = 20
-            thumb_x = RIGHT_PANEL_X + 20
-            for i in range(THUMBS_PER_ROW):
-                idx = i
-                if idx >= len(puzzle.templates):
-                    break
+            # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
+            thumb_x = getattr(puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
+            thumb_y = getattr(puzzle, '_thumb_y', 20)
+            if not hasattr(puzzle, 'thumb_scroll_offset'):
+                puzzle.thumb_scroll_offset = 0
+            # Check left/right arrow click
+            arrow_size = 18
+            arrow_offset_y = thumb_y + IMAGE_THUMB_SIZE // 2 - arrow_size // 2
+            if len(puzzle.templates) > THUMBS_PER_ROW:
+                left_rect = pygame.Rect(thumb_x - arrow_size - 8, arrow_offset_y, arrow_size, arrow_size)
+                right_rect = pygame.Rect(thumb_x + THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) + 8, arrow_offset_y, arrow_size, arrow_size)
+                if left_rect.collidepoint(mx, my) and puzzle.thumb_scroll_offset > 0:
+                    puzzle.thumb_scroll_offset -= 1
+                    return is_solving, action
+                if right_rect.collidepoint(mx, my) and puzzle.thumb_scroll_offset < max(0, len(puzzle.templates) - THUMBS_PER_ROW):
+                    puzzle.thumb_scroll_offset += 1
+                    return is_solving, action
+            # Tính lại vị trí click trong frame
+            frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
+            frame_height = IMAGE_THUMB_SIZE
+            rel_mx = mx - thumb_x
+            rel_my = my - thumb_y
+            for i in range(len(puzzle.templates)):
+                offset_x = (i - puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
                 rect = pygame.Rect(
-                    thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
-                    thumb_y,
+                    int(offset_x),
+                    0,
                     IMAGE_THUMB_SIZE,
                     IMAGE_THUMB_SIZE
                 )
-                if rect.collidepoint(mx, my):
-                    puzzle.prepare_fade(idx)
+                if rect.right < 0 or rect.left > frame_width:
+                    continue
+                if rect.collidepoint(rel_mx, rel_my):
+                    puzzle.prepare_fade(i)
                     action = 'board_changed'
                     return is_solving, action
     return is_solving, action
@@ -242,22 +322,41 @@ class GameUI:
             self.solve_btn.color_override = None
             self.is_solving = False
             return
-        # Thumbnail click
+        # Thumbnail click with scroll
         if not self.is_solving:
-            thumb_y = 20
-            thumb_x = RIGHT_PANEL_X + 20
-            for i in range(THUMBS_PER_ROW):
-                idx = i
-                if idx >= len(self.puzzle.templates):
-                    break
+            # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
+            thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
+            thumb_y = getattr(self.puzzle, '_thumb_y', 20)
+            if not hasattr(self.puzzle, 'thumb_scroll_offset'):
+                self.puzzle.thumb_scroll_offset = 0
+            arrow_size = 18
+            arrow_offset_y = thumb_y + IMAGE_THUMB_SIZE // 2 - arrow_size // 2
+            if len(self.puzzle.templates) > THUMBS_PER_ROW:
+                left_rect = pygame.Rect(thumb_x - arrow_size - 8, arrow_offset_y, arrow_size, arrow_size)
+                right_rect = pygame.Rect(thumb_x + THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) + 8, arrow_offset_y, arrow_size, arrow_size)
+                if left_rect.collidepoint(mx, my) and self.puzzle.thumb_scroll_offset > 0:
+                    self.puzzle.thumb_scroll_offset -= 1
+                    return
+                if right_rect.collidepoint(mx, my) and self.puzzle.thumb_scroll_offset < max(0, len(self.puzzle.templates) - THUMBS_PER_ROW):
+                    self.puzzle.thumb_scroll_offset += 1
+                    return
+            # Tính lại vị trí click trong frame
+            frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
+            frame_height = IMAGE_THUMB_SIZE
+            rel_mx = mx - thumb_x
+            rel_my = my - thumb_y
+            for i in range(len(self.puzzle.templates)):
+                offset_x = (i - self.puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
                 rect = pygame.Rect(
-                    thumb_x + i * (IMAGE_THUMB_SIZE + THUMBS_SPACING),
-                    thumb_y,
+                    int(offset_x),
+                    0,
                     IMAGE_THUMB_SIZE,
                     IMAGE_THUMB_SIZE
                 )
-                if rect.collidepoint(mx, my):
-                    self.puzzle.prepare_fade(idx)
+                if rect.right < 0 or rect.left > frame_width:
+                    continue
+                if rect.collidepoint(rel_mx, rel_my):
+                    self.puzzle.prepare_fade(i)
                     # Enable lại solve_btn khi đổi puzzle
                     self.solve_btn.label = "Solve"
                     self.solve_btn.color_override = None

@@ -6,6 +6,8 @@ from ui import GameUI
 
 def main():
     pygame.init()
+    pygame.display.set_caption("Eight Puzzle Solver")
+    pygame.display.set_icon(pygame.image.load("assets/icon_32.png"))
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     clock = pygame.time.Clock()
     puzzle = EightPuzzle(screen)
