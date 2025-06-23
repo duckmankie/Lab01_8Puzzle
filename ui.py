@@ -7,11 +7,8 @@ from puzzle import pixel_to_grid
 
 def draw_ui(screen, solve_btn, next_btn, reset_btn, dropdown, checkbox, puzzle, is_solving, solve_btn_color_progress, tween_color, solve_btn_disabled=False):
     # Draw solve_btn với tween color chỉ khi đang solve, còn lại để None để dùng COLOR_BUTTON mặc định
-    solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=(tween_color if solve_btn.color_override is not None else None))
-    if solve_btn_disabled:
-        s = pygame.Surface((solve_btn.rect.width, solve_btn.rect.height), pygame.SRCALPHA)
-        s.fill((0,0,0,80))
-        screen.blit(s, solve_btn.rect.topleft)
+    solve_btn.draw(screen, disabled_hover=False, disabled=False, color_override=solve_btn.color_override)
+    # Không vẽ overlay mờ khi disabled nữa, hiệu ứng disabled đã xử lý trong Button.draw
     # Next/Reset buttons
     next_btn.draw(screen, disabled_hover=False)
     reset_btn.draw(screen, disabled_hover=False)
@@ -207,34 +204,97 @@ class GameUI:
         self.SOLVE_BTN_TWEEN_SPEED = 0.08
 
     def draw(self):
-        # Xử lý trạng thái nút Solve khi completed
+        # --- Tween logic cho Solve button ---
+        if not hasattr(self.solve_btn, 'prev_state'):
+            self.solve_btn.prev_state = 'normal'
+        if not hasattr(self, 'solve_btn_color_progress'):
+            self.solve_btn_color_progress = 0.0
+        # Xác định trạng thái hiện tại
         if self.puzzle.completed:
+            curr_state = 'solved'
+        elif self.puzzle.is_calculating:
+            curr_state = 'calculating'
+        elif self.puzzle.auto_solving:
+            curr_state = 'stop'
+        elif self.solve_btn.disabled:
+            curr_state = 'disabled'
+        else:
+            curr_state = 'normal'
+        # Tween màu khi chuyển trạng thái
+        # Từ normal -> stop: tween sang đỏ
+        # Từ stop -> normal: tween về màu gốc
+        # Từ enabled <-> disabled: tween fade tối/sáng
+        SOLVE_COLOR_NORMAL = COLOR_BUTTON
+        SOLVE_COLOR_STOP = (244,60,68)
+        SOLVE_COLOR_DISABLED = darken_color(COLOR_BUTTON, 40)
+        # Xử lý tween
+        if self.solve_btn.prev_state != curr_state:
+            self.solve_btn_color_progress = 0.0
+        if curr_state == 'stop':
+            # Tween sang đỏ
+            if self.solve_btn_color_progress < 1.0:
+                self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
+            color_now = tuple(
+                int(SOLVE_COLOR_NORMAL[i] + (SOLVE_COLOR_STOP[i] - SOLVE_COLOR_NORMAL[i]) * self.solve_btn_color_progress)
+                for i in range(3)
+            )
+        elif curr_state == 'normal':
+            # Tween về màu gốc
+            if self.solve_btn_color_progress > 0.0:
+                self.solve_btn_color_progress = max(0.0, self.solve_btn_color_progress - self.SOLVE_BTN_TWEEN_SPEED)
+            color_now = tuple(
+                int(SOLVE_COLOR_NORMAL[i] + (SOLVE_COLOR_STOP[i] - SOLVE_COLOR_NORMAL[i]) * self.solve_btn_color_progress)
+                for i in range(3)
+            )
+        elif curr_state == 'disabled':
+            # Tween fade tối
+            if self.solve_btn_color_progress < 1.0:
+                self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
+            color_now = tuple(
+                int(SOLVE_COLOR_NORMAL[i] + (SOLVE_COLOR_DISABLED[i] - SOLVE_COLOR_NORMAL[i]) * self.solve_btn_color_progress)
+                for i in range(3)
+            )
+        elif curr_state == 'calculating':
+            color_now = SOLVE_COLOR_NORMAL
+        elif curr_state == 'solved':
+            color_now = COLOR_BG
+        else:
+            color_now = SOLVE_COLOR_NORMAL
+        # Cập nhật trạng thái solve_btn
+        if curr_state == 'solved':
             self.solve_btn.label = "Solved"
-            self.solve_btn.color_override = COLOR_BG
-            solve_disabled = True
-            self.is_solving = False
-            self.solve_btn.disabled = True  # Custom attribute to mark as truly disabled
-        else:
-            if not self.is_solving:
-                self.solve_btn.label = "Solve"
-                self.solve_btn.color_override = None
-            solve_disabled = False
+            self.solve_btn.disabled = True
+            self.solve_btn.outline_override = None
+        elif curr_state == 'calculating':
+            self.solve_btn.label = "Calculating..."
+            self.solve_btn.disabled = True
+            self.solve_btn.outline_override = None
+        elif curr_state == 'stop':
+            self.solve_btn.label = "Stop"
             self.solve_btn.disabled = False
-        # Tween màu solve_btn
-        solve_btn_base = COLOR_BG
-        solve_btn_red = (234, 69, 69)
-        if self.is_solving:
-            self.solve_btn_color_progress = min(1.0, self.solve_btn_color_progress + self.SOLVE_BTN_TWEEN_SPEED)
+            self.solve_btn.outline_override = (237,20,20)
         else:
-            self.solve_btn_color_progress = max(0.0, self.solve_btn_color_progress - self.SOLVE_BTN_TWEEN_SPEED)
-        tween_color = tuple(
-            int(solve_btn_base[i] + (solve_btn_red[i] - solve_btn_base[i]) * self.solve_btn_color_progress)
-            for i in range(3)
+            self.solve_btn.label = "Solve"
+            self.solve_btn.disabled = False
+            self.solve_btn.outline_override = None
+        self.solve_btn.color_override = color_now
+        self.solve_btn.prev_state = curr_state
+        # Next button chỉ hoạt động khi đã calculate xong, chưa completed, không auto_solving
+        self.next_btn.disabled = (
+            self.puzzle.is_calculating or
+            not self.puzzle.solution_path or
+            self.puzzle.completed or
+            self.puzzle.auto_solving
+        )
+        # Reset button chỉ enable khi không calculating, không auto_solving, không completed
+        self.reset_btn.disabled = (
+            self.puzzle.is_calculating or
+            self.puzzle.auto_solving
         )
         # Vẽ UI, truyền trạng thái disable cho solve_btn
-        draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, tween_color, solve_btn_disabled=solve_disabled)
+        draw_ui(self.screen, self.solve_btn, self.next_btn, self.reset_btn, self.dropdown, self.checkbox, self.puzzle, self.is_solving, self.solve_btn_color_progress, self.solve_btn.color_override, solve_btn_disabled=self.solve_btn.disabled)
         # Ensure the button is truly not clickable when disabled
-        self.solve_btn.disabled = solve_disabled
+        # self.solve_btn.disabled = solve_disabled  # Đã loại bỏ solve_disabled, không cần dòng này nữa
 
         # --- Result display ---
         font_result = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 20)
@@ -270,8 +330,8 @@ class GameUI:
         self.dropdown.draw(self.screen)
 
     def handle_click(self, mx, my):
-        # Dropdown click
-        if not self.is_solving:
+        # Dropdown click chỉ hoạt động khi không calculating, không auto_solving
+        if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
             dd_choice = self.dropdown.is_clicked(mx, my)
             if dd_choice is not None:
                 self.puzzle.selected_algorithm = ALGORITHMS[dd_choice]
@@ -298,19 +358,19 @@ class GameUI:
             return
         # Buttons click
         if self.solve_btn.is_clicked(mx, my):
-            if self.puzzle.completed:
-                return  # Đã solved thì không cho bấm nữa
-            if not self.is_solving:
-                self.is_solving = True
-                self.solve_btn.label = "Stop"
-                self.solve_btn.color_override = (237,85,85)
-                self.puzzle.solve()
-            else:
-                self.is_solving = False
+            if self.puzzle.is_calculating or self.puzzle.completed:
+                return
+            if self.puzzle.auto_solving:
+                self.puzzle.stop_solve()
                 self.solve_btn.label = "Solve"
                 self.solve_btn.color_override = None
-                if hasattr(self.puzzle, 'stop_solve'):
-                    self.puzzle.stop_solve()
+            else:
+                if not self.puzzle.solution_path:
+                    self.puzzle.solve()
+                else:
+                    self.puzzle.auto_solving = True
+                    if self.puzzle.auto_solve_index >= len(self.puzzle.solution_path):
+                        self.puzzle.auto_solve_index = 0
             return
         if self.next_btn.is_clicked(mx, my):
             self.puzzle.next_step()
@@ -322,8 +382,8 @@ class GameUI:
             self.solve_btn.color_override = None
             self.is_solving = False
             return
-        # Thumbnail click with scroll
-        if not self.is_solving:
+        # Thumbnail click với scroll chỉ hoạt động khi không calculating, không auto_solving
+        if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
             # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
             thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
             thumb_y = getattr(self.puzzle, '_thumb_y', 20)
@@ -370,6 +430,7 @@ class Button:
         self.font = pygame.font.Font("assets/fonts/HelveticaNeueRoman.otf", 22)
         self.hover_amount = 0  # For tween effect
         self.color_override = color_override
+        self.disabled = False
 
     def draw(self, screen, disabled_hover=False, disabled=False, color_override=None):
         mx, my = pygame.mouse.get_pos()
@@ -392,8 +453,12 @@ class Button:
             self.hover_amount = max(self.hover_amount - FADE_HOVER_SPEED, 0)
         color = lighten_color(base_color, int(self.hover_amount) if not is_disabled else 0)
         pygame.draw.rect(screen, color, self.rect, border_radius=BUTTON_RADIUS)
-        pygame.draw.rect(screen, BUTTON_OUTLINE_COLOR, self.rect, BUTTON_OUTLINE_THICKNESS, border_radius=BUTTON_RADIUS)
-        txt = self.font.render(self.label, True, COLOR_TEXT)
+        # Outline động
+        outline_color = getattr(self, 'outline_override', None) or BUTTON_OUTLINE_COLOR
+        pygame.draw.rect(screen, outline_color, self.rect, BUTTON_OUTLINE_THICKNESS, border_radius=BUTTON_RADIUS)
+        # Nếu disabled thì text cũng tối đi
+        txt_color = COLOR_TEXT if not is_disabled else darken_color(COLOR_TEXT, 100)
+        txt = self.font.render(self.label, True, txt_color)
         # Padding cho text
         PADDING_X = 12
         PADDING_Y = 6

@@ -48,6 +48,7 @@ def ease_out_quint(t):
 class EightPuzzle:
     def __init__(self, screen):
         self.screen = screen
+        self.is_calculating = False
         
         self.templates = ALL_TEMPLATE_FILES[:]
         self.selected_index = 0
@@ -310,8 +311,9 @@ class EightPuzzle:
                 self.screen.blit(text_surf, (tx, ty))
     
     def solve(self):
-        if self.in_fade or self.in_reset or self.moving or self.auto_solving:
+        if self.in_fade or self.in_reset or self.moving or self.auto_solving or self.is_calculating:
             return
+        self.is_calculating = True  # Đặt ngay khi bấm solve
         threading.Thread(target=self._thread_solve, daemon=True).start()
 
     def _thread_solve(self):
@@ -339,6 +341,7 @@ class EightPuzzle:
         self.total_cost = total_cost
         self.solve_time = solve_time
         self.frontier_nodes = frontier_nodes
+        self.is_calculating = False  # Kết thúc tính toán
         self.auto_solving = True
         self.auto_solve_index = 0
         self.auto_step_time = pygame.time.get_ticks()
