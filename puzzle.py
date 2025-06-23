@@ -4,8 +4,7 @@ import sys
 import math
 from constants import *
 import threading
-from solver import bfs, dfs, ucs, iddfs, find_blank
-
+from solver import bfs, dfs, ucs, astar, ida_star, beam_search, bidirectional_search, iddfs, find_blank, dijkstra
 def is_solvable(flat_list):
     inv_count = 0
     for i in range(8):
@@ -325,6 +324,14 @@ class EightPuzzle:
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = iddfs(self.board)
         elif algo == "UCS":
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = ucs(self.board)
+        elif algo == "A*":
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = astar(self.board)
+        elif algo == "IDA*":
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = ida_star(self.board)
+        elif algo == "Bi-dir Search":
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = bidirectional_search(self.board)
+        elif algo == "Dijkstra":
+            path, nodes_expanded, total_cost, solve_time, frontier_nodes = dijkstra(self.board)
         else:
             path, nodes_expanded, total_cost, solve_time, frontier_nodes = [], 0, 0, 0.0, 0
         self.solution_path = path
