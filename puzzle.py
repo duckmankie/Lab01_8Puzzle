@@ -386,12 +386,7 @@ class EightPuzzle:
         self.in_reset = True
         self.reset_start_time = pygame.time.get_ticks()
 
-    def prepare_fade(self, new_index):
-        if new_index == self.selected_index:
-            return
-        if self.moving or self.in_reset or self.in_fade:
-            return
-        # Reset trạng thái giải khi đổi template
+    def reset_solve_state(self):
         self.solution_path = []
         self.nodes_expanded = 0
         self.total_cost = 0
@@ -400,6 +395,15 @@ class EightPuzzle:
         self.auto_solve_index = 0
         self.auto_solving = False
         self.completed = False
+        self.is_calculating = False
+
+    def prepare_fade(self, new_index):
+        if new_index == self.selected_index:
+            return
+        if self.moving or self.in_reset or self.in_fade:
+            return
+        # Reset trạng thái giải khi đổi template
+        self.reset_solve_state()
         self.fade_old_surface = self.capture_puzzle_surface(
             self.pieces, self.board, self.full_image, self.show_numbers
         )

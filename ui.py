@@ -202,6 +202,7 @@ class GameUI:
         self.is_solving = False
         self.solve_btn_color_progress = 0.0
         self.SOLVE_BTN_TWEEN_SPEED = 0.08
+        self.locked_interaction = False
 
     def draw(self):
         # --- Tween logic cho Solve button ---
@@ -330,6 +331,115 @@ class GameUI:
         self.dropdown.draw(self.screen)
 
     def handle_click(self, mx, my):
+        # Chỉ xử lý dropdown khi KHÔNG đang solving
+        if (self.dropdown.header_rect.collidepoint(mx, my) or self.dropdown.is_open) and not self.puzzle.auto_solving:
+            was_open = self.dropdown.is_open
+            dd_choice = self.dropdown.is_clicked(mx, my)
+            if was_open and dd_choice is not None:
+                new_algo = self.dropdown.options[dd_choice]
+                if new_algo != self.puzzle.selected_algorithm:
+                    self.puzzle.selected_algorithm = new_algo
+                    self.puzzle.reset_solve_state()
+                    self.solve_btn.label = "Solve"
+                    self.solve_btn.color_override = None
+                    self.solve_btn.disabled = False
+                    self.is_solving = False
+                    self.locked_interaction = False
+                return
+            # Nếu vừa click header để mở menu, không return, cho phép xử lý tiếp các nút khác
+            if not was_open and self.dropdown.is_open:
+                return
+            # Nếu menu đang mở nhưng click ra ngoài, đóng menu
+            if was_open and not self.dropdown.is_open:
+                return
+        # Nếu locked_interaction, chỉ chặn các thao tác với board, template, dropdown
+        if self.locked_interaction:
+            # Nếu vẫn đang auto_solving thì vẫn chặn như cũ
+            if self.puzzle.auto_solving:
+                # Chặn đổi thuật toán
+                if self.dropdown.header_rect.collidepoint(mx, my):
+                    return
+                # Chặn đổi template (thumbnail, scroll)
+                thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
+                thumb_y = getattr(self.puzzle, '_thumb_y', 20)
+                frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
+                frame_height = IMAGE_THUMB_SIZE
+                rel_mx = mx - thumb_x
+                rel_my = my - thumb_y
+                for i in range(len(self.puzzle.templates)):
+                    offset_x = (i - self.puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
+                    rect = pygame.Rect(
+                        int(offset_x),
+                        0,
+                        IMAGE_THUMB_SIZE,
+                        IMAGE_THUMB_SIZE
+                    )
+                    if rect.right < 0 or rect.left > frame_width:
+                        continue
+                    if rect.collidepoint(rel_mx, rel_my):
+                        return
+                # Chặn di chuyển ô trên board
+                if (PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
+                    PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE):
+                    return
+            else:
+                # Đã stop giữa chừng, cho phép chọn lại template/thuật toán, nếu chọn thì reset
+                if self.dropdown.header_rect.collidepoint(mx, my):
+                    current_algo = self.dropdown.options[self.dropdown.current]
+                    dd_choice = self.dropdown.is_clicked(mx, my)
+                    if dd_choice is not None:
+                        new_algo = ALGORITHMS[dd_choice]
+                        self.puzzle.selected_algorithm = new_algo
+                        if new_algo != current_algo:
+                            self.puzzle.reset_solve_state()
+                            self.solve_btn.label = "Solve"
+                            self.solve_btn.color_override = None
+                            self.is_solving = False
+                            self.locked_interaction = False
+                            # Đồng bộ dropdown.current với thuật toán mới
+                            self.dropdown.current = dd_choice
+                    return
+                thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
+                thumb_y = getattr(self.puzzle, '_thumb_y', 20)
+                frame_width = THUMBS_PER_ROW * (IMAGE_THUMB_SIZE + THUMBS_SPACING) - THUMBS_SPACING
+                frame_height = IMAGE_THUMB_SIZE
+                rel_mx = mx - thumb_x
+                rel_my = my - thumb_y
+                for i in range(len(self.puzzle.templates)):
+                    offset_x = (i - self.puzzle.thumb_scroll_anim) * (IMAGE_THUMB_SIZE + THUMBS_SPACING)
+                    rect = pygame.Rect(
+                        int(offset_x),
+                        0,
+                        IMAGE_THUMB_SIZE,
+                        IMAGE_THUMB_SIZE
+                    )
+                    if rect.right < 0 or rect.left > frame_width:
+                        continue
+                    if rect.collidepoint(rel_mx, rel_my):
+                        self.puzzle.prepare_fade(i)
+                        self.solve_btn.label = "Solve"
+                        self.solve_btn.color_override = None
+                        self.is_solving = False
+                        self.locked_interaction = False
+                        return
+                # Chặn di chuyển ô trên board
+                if (PUZZLE_OFFSET_X <= mx < PUZZLE_OFFSET_X + PUZZLE_SIZE and
+                    PUZZLE_OFFSET_Y <= my < PUZZLE_OFFSET_Y + PUZZLE_SIZE):
+                    return
+        # Nếu đã completed, unlock toàn bộ tương tác (reset locked_interaction)
+        if self.puzzle.completed:
+            self.locked_interaction = False
+            if self.reset_btn.is_clicked(mx, my):
+                self.puzzle.shuffle()
+                self.solve_btn.label = "Solve"
+                self.solve_btn.color_override = None
+                self.is_solving = False
+                self.locked_interaction = False
+                return
+            if self.checkbox.is_clicked(mx, my):
+                self.puzzle.toggle_numbers()
+                return
+            return
         # Dropdown click chỉ hoạt động khi không calculating, không auto_solving
         if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
             dd_choice = self.dropdown.is_clicked(mx, my)
@@ -367,10 +477,12 @@ class GameUI:
             else:
                 if not self.puzzle.solution_path:
                     self.puzzle.solve()
+                    self.locked_interaction = True
                 else:
                     self.puzzle.auto_solving = True
                     if self.puzzle.auto_solve_index >= len(self.puzzle.solution_path):
                         self.puzzle.auto_solve_index = 0
+                    self.locked_interaction = True
             return
         if self.next_btn.is_clicked(mx, my):
             self.puzzle.next_step()
@@ -381,9 +493,10 @@ class GameUI:
             self.solve_btn.label = "Solve"
             self.solve_btn.color_override = None
             self.is_solving = False
+            self.locked_interaction = False
             return
-        # Thumbnail click với scroll chỉ hoạt động khi không calculating, không auto_solving
-        if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving:
+        # Thumbnail click với scroll chỉ hoạt động khi không calculating, không auto_solving, không completed
+        if not self.is_solving and not self.puzzle.is_calculating and not self.puzzle.auto_solving and not self.puzzle.completed:
             # Lấy lại thumb_x, thumb_y đúng vị trí vẽ
             thumb_x = getattr(self.puzzle, '_thumb_x', RIGHT_PANEL_X + 50)
             thumb_y = getattr(self.puzzle, '_thumb_y', 20)
